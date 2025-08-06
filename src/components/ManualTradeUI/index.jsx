@@ -211,7 +211,7 @@ const ManualTradeUI = () => {
 
     funds.forEach(async (fund, index) => {
       const jsonData = {
-        quantity: fund.manualTradeQuantity,
+        quantity: 70,
         instrument_token: instrumentKey,
         access_token: fund.sandbox_token,
         total_amount:fund?.funds,
@@ -243,7 +243,7 @@ const ManualTradeUI = () => {
 
     funds.forEach(async (fund, index) => {
       const jsonData = {
-        quantity: fund.manualTradeQuantity,
+        quantity: 70,
         instrument_token: instrumentKey,
         access_token: fund.sandbox_token,
         total_amount:fund?.funds,
@@ -272,10 +272,11 @@ useEffect(() => {
 }, [instrumentKey]);
 
 const countLtp = async () => {
+  const fund = JSON.parse(localStorage.getItem('funds'))
   const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrumentKey}`;
   const headers = {
     'Accept': 'application/json',
-    'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiIzWUNRM0MiLCJqdGkiOiI2ODkxODNiMWI1MDlhZDE5ZDU4NzRmNGYiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDM2Njg5NywiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0NDMxMjAwfQ.DVL04OwiY-L7WE7pVEf0SNqZYeJoFzJ6_YVoIoKeLYI' // keep secure
+    'Authorization': `Bearer ${fund[0]?.token}` // keep secure
   };
 
   try {
@@ -301,6 +302,48 @@ const countLtp = async () => {
 };
 
 
+// function calculateAndStoreQuantities(ltp, lotSize) {
+//   if (!ltp || !lotSize || ltp <= 0) {
+//     console.error("Invalid LTP or lotSize");
+//     return;
+//   }
+
+//   const fundsRaw = localStorage.getItem("funds");
+//   if (!fundsRaw) {
+//     console.error("No funds found in localStorage");
+//     return;
+//   }
+
+//   let funds;
+//   try {
+//     funds = JSON.parse(fundsRaw);
+//   } catch (e) {
+//     console.error("Failed to parse funds JSON:", e);
+//     return;
+//   }
+
+//   const updatedFunds = funds.map((fund, index) => {
+//     const investableAmount = parseFloat(fund.invest_amount);
+
+//     if (!investableAmount || investableAmount <= 0) {
+//       console.warn(`Invalid investableAmount for fund at index ${index}`);
+//       return { ...fund, manualTradeQuantity: 0 };
+//     }
+
+//     const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
+//     const quantity = numberOfLots * lotSize;
+
+//     console.log(`[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`);
+
+//     return {
+//       ...fund,
+//       manualTradeQuantity: quantity
+//     };
+//   });
+
+//   localStorage.setItem("funds", JSON.stringify(updatedFunds));
+//   console.log("✅ Updated funds with manualTradeQuantity saved.");
+// }
 function calculateAndStoreQuantities(ltp, lotSize) {
   if (!ltp || !lotSize || ltp <= 0) {
     console.error("Invalid LTP or lotSize");
@@ -324,9 +367,10 @@ function calculateAndStoreQuantities(ltp, lotSize) {
   const updatedFunds = funds.map((fund, index) => {
     const investableAmount = parseFloat(fund.invest_amount);
 
+    // ✅ Skip updating manualTradeQuantity if invest_amount is invalid
     if (!investableAmount || investableAmount <= 0) {
-      console.warn(`Invalid investableAmount for fund at index ${index}`);
-      return { ...fund, manualTradeQuantity: 0 };
+      console.warn(`Invalid investableAmount for fund at index ${index}, keeping existing quantity.`);
+      return fund; // Return unchanged fund object
     }
 
     const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
@@ -339,9 +383,11 @@ function calculateAndStoreQuantities(ltp, lotSize) {
       manualTradeQuantity: quantity
     };
   });
-
+  console.log(updatedFunds,"updatedFunds");
+  
   localStorage.setItem("funds", JSON.stringify(updatedFunds));
-  console.log("✅ Updated funds with manualTradeQuantity saved.");
+  const getFund = JSON.parse(localStorage.getItem('funds'))
+  console.log(getFund,"✅ Updated funds with manualTradeQuantity saved.");
 }
 
 

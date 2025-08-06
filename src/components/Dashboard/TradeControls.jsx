@@ -44,11 +44,11 @@ const TradeTable = ({ data, setData,rtpValue,setRtpValue,reverseTrade,setReverse
   //     editMode: false,
   //   },
   // ]);
-  useEffect(() => {
-    if (data?.length > 0) {
-      handleGetToken();
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (data?.length > 0) {
+  //     handleGetToken();
+  //   }
+  // }, []);
 
 
   const { ceData, peData } = useWebSocket();
@@ -71,146 +71,146 @@ const TradeTable = ({ data, setData,rtpValue,setRtpValue,reverseTrade,setReverse
     );
   }, [ceData, peData]);
 
-  const handleGetToken = async () => {
-    const payload = {
-      options: data.map((f) => ({
-        name: f.instrument === 'Nifty Bank' ? 'BANKNIFTY' : f.instrument,
-        expiry: f.dateOfContract,
-        option_type: f.type === 'CALL' ? 'CE' : 'PE',
-        strike: parseFloat(f.strikePrice),
-      })),
-    };
+  // const handleGetToken = async () => {
+  //   const payload = {
+  //     options: data.map((f) => ({
+  //       name: f.instrument === 'Nifty Bank' ? 'BANKNIFTY' : f.instrument,
+  //       expiry: f.dateOfContract,
+  //       option_type: f.type === 'CALL' ? 'CE' : 'PE',
+  //       strike: parseFloat(f.strikePrice),
+  //     })),
+  //   };
 
-    try {
-      const response = await fetch(`${process.env.REACT_APP_BASE_URL}ManualTrade/gettoken/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+  //   try {
+  //     const response = await fetch(`${process.env.REACT_APP_BASE_URL}ManualTrade/gettoken/`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify(payload),
+  //     });
 
-      const result = await response.json();
+  //     const result = await response.json();
 
-      if (response.ok) {
-        // Map response back to original data and update state
-        // const updatedData = data.map((item) => {
-        //   const matched = result.results.find(
-        //     (res) =>
-        //       res.name === item.instrument &&
-        //       res.expiry === item.dateOfContract &&
-        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
-        //       res.strike === parseFloat(item.strikePrice)
-        //   );
+  //     if (response.ok) {
+  //       // Map response back to original data and update state
+  //       // const updatedData = data.map((item) => {
+  //       //   const matched = result.results.find(
+  //       //     (res) =>
+  //       //       res.name === item.instrument &&
+  //       //       res.expiry === item.dateOfContract &&
+  //       //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+  //       //       res.strike === parseFloat(item.strikePrice)
+  //       //   );
 
-        //   return matched
-        //     ? {
-        //         ...item,
-        //         instrument_key: matched.instrument_key,
-        //         trading_symbol: matched.tradingsymbol,
-        //       }
-        //     : item;
-        // });
-        const updatedData = data.map((item) => {
-          const matched = result.results.find(
-            (res) =>
-              res.name === item.instrument &&
-              res.expiry === item.dateOfContract &&
-              res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
-              res.strike === parseFloat(item.strikePrice)
-          );
+  //       //   return matched
+  //       //     ? {
+  //       //         ...item,
+  //       //         instrument_key: matched.instrument_key,
+  //       //         trading_symbol: matched.tradingsymbol,
+  //       //       }
+  //       //     : item;
+  //       // });
+  //       const updatedData = data.map((item) => {
+  //         const matched = result.results.find(
+  //           (res) =>
+  //             res.name === item.instrument &&
+  //             res.expiry === item.dateOfContract &&
+  //             res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+  //             res.strike === parseFloat(item.strikePrice)
+  //         );
 
-          if (matched) {
-            // Call countLtp here with matched instrument_key
-            countLtp(matched.instrument_key);
+  //         if (matched) {
+  //           // Call countLtp here with matched instrument_key
+  //           countLtp(matched.instrument_key);
 
-            return {
-              ...item,
-              instrument_key: matched.instrument_key,
-              trading_symbol: matched.tradingsymbol,
-            };
-          }
+  //           return {
+  //             ...item,
+  //             instrument_key: matched.instrument_key,
+  //             trading_symbol: matched.tradingsymbol,
+  //           };
+  //         }
 
-          return item;
-        });
+  //         return item;
+  //       });
 
-        setData(updatedData);
-      } else {
-        alert('❌ Failed to track.');
-      }
-    } catch (error) {
-      console.error('API error:', error);
-      alert('❌ Error occurred during tracking.');
-    }
-  };
-  const countLtp = async (instrument_key) => {
-    const fundsData = JSON.parse(localStorage.getItem('funds'));
-    console.log(fundsData,"fundsData");
+  //       setData(updatedData);
+  //     } else {
+  //       alert('❌ Failed to track.');
+  //     }
+  //   } catch (error) {
+  //     console.error('API error:', error);
+  //     alert('❌ Error occurred during tracking.');
+  //   }
+  // };
+  // const countLtp = async (instrument_key) => {
+  //   const fundsData = JSON.parse(localStorage.getItem('funds'));
+  //   console.log(fundsData,"fundsData");
     
-    const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
-    const headers = {
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${fundsData[0]?.token}`
-    };
+  //   const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
+  //   const headers = {
+  //     'Accept': 'application/json',
+  //     'Authorization': `Bearer ${fundsData[0]?.token}`
+  //   };
 
-    if (instrument_key) {
-      try {
-        const response = await axios.get(url, { headers });
-        const data = response.data?.data;
+  //   if (instrument_key) {
+  //     try {
+  //       const response = await axios.get(url, { headers });
+  //       const data = response.data?.data;
 
-        if (data) {
-          // Extract the first key dynamically
-          const firstKey = Object.keys(data)[0];
-          const lastPrice = data[firstKey]?.last_price;
-          calculateAndStoreQuantities(lastPrice)
+  //       if (data) {
+  //         // Extract the first key dynamically
+  //         const firstKey = Object.keys(data)[0];
+  //         const lastPrice = data[firstKey]?.last_price;
+  //         calculateAndStoreQuantities(lastPrice)
 
-        } else {
-          console.error('No data returned');
-        }
-      } catch (error) {
-        console.error('Error fetching LTP:', error.response?.data || error.message);
-      }
-    }
-  };
+  //       } else {
+  //         console.error('No data returned');
+  //       }
+  //     } catch (error) {
+  //       console.error('Error fetching LTP:', error.response?.data || error.message);
+  //     }
+  //   }
+  // };
 
-  function calculateAndStoreQuantities(ltp) {
-    if (!ltp || ltp <= 0) {
-      console.error("Invalid LTP");
-      return;
-    }
+  // function calculateAndStoreQuantities(ltp) {
+  //   if (!ltp || ltp <= 0) {
+  //     console.error("Invalid LTP");
+  //     return;
+  //   }
 
-    const fundsRaw = localStorage.getItem("funds");
-    if (!fundsRaw) {
-      console.error("No funds found in localStorage");
-      return;
-    }
+  //   const fundsRaw = localStorage.getItem("funds");
+  //   if (!fundsRaw) {
+  //     console.error("No funds found in localStorage");
+  //     return;
+  //   }
 
-    const funds = JSON.parse(fundsRaw);
+  //   const funds = JSON.parse(fundsRaw);
 
-    const updatedFunds = funds.map((fund, index) => {
-      const investableAmount = parseInt(fund.funds);
-      const lotSize = parseInt(fund.call_lot) + parseInt(fund.put_lot)
-      // const lotSize = parseInt(fund.lotSize);
+  //   const updatedFunds = funds.map((fund, index) => {
+  //     const investableAmount = parseInt(fund.funds);
+  //     const lotSize = parseInt(fund.call_lot) + parseInt(fund.put_lot)
+  //     // const lotSize = parseInt(fund.lotSize);
 
-      if (!investableAmount || !lotSize) {
-        console.error(`Invalid fund at index ${index}`);
-        return { ...fund, call_quantity: 0,put_quantity:0 };
-      }
+  //     if (!investableAmount || !lotSize) {
+  //       console.error(`Invalid fund at index ${index}`);
+  //       return { ...fund, call_quantity: 0,put_quantity:0 };
+  //     }
 
-      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
-      const quantity = numberOfLots * lotSize;
+  //     const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
+  //     const quantity = numberOfLots * lotSize;
 
-      return {
-        ...fund,
-        call_quantity: quantity,
-        put_quantity: quantity
-      };
-    });
+  //     return {
+  //       ...fund,
+  //       call_quantity: quantity,
+  //       put_quantity: quantity
+  //     };
+  //   });
 
-    // Save updated funds back to localStorage
-    localStorage.setItem("funds", JSON.stringify(updatedFunds));
-    console.log("Updated funds with manualTradeQuantity saved to localStorage.");
-  }
+  //   // Save updated funds back to localStorage
+  //   localStorage.setItem("funds", JSON.stringify(updatedFunds));
+  //   console.log("Updated funds with manualTradeQuantity saved to localStorage.");
+  // }
   return (
     <>
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
