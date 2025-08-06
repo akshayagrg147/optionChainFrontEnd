@@ -1,9 +1,32 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import NotificationPanel from "../../Common/Notification";
+import { FaBell } from "react-icons/fa";
 
 const Topbar = () => {
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const notificationRef = useRef(null);
   const handleNotificationClick = () => {
-    alert("You have no new notifications.");
+    setNotificationOpen(!notificationOpen); // Only open on click
   };
+
+  // 🧠 Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target)
+      ) {
+        setNotificationOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleEmergencyClick = () => {
     alert("Emergency Square-Off triggered!");
@@ -19,9 +42,16 @@ const Topbar = () => {
         <button className="bg-yellow-500 text-white px-4 py-1 rounded hover:bg-yellow-600 text-sm">
           Simulation
         </button>
+        <Link to={'/square-off'}>
+          <button className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 text-sm">
+            Square off settings
+          </button>
+        </Link>
+        <Link to={'/manual-trade'}>
         <button className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 text-sm">
           Manual Trade Setup
         </button>
+        </Link>
         <button className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm">
           Settings
         </button>
@@ -29,20 +59,25 @@ const Topbar = () => {
 
       {/* Right Side Buttons */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={handleNotificationClick}
-          className="bg-gray-200 text-gray-800 px-4 py-1 rounded hover:bg-gray-300 text-sm"
-        >
-          Notifications
-        </button>
 
         <button
-          onClick={handleEmergencyClick}
+          // onClick={handleEmergencyClick}
           className="bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
         >
           🚨 Emergency Square-Off
         </button>
+
+        <button
+          onClick={handleNotificationClick}
+          ref={notificationRef}
+          className=" px-2 py-2 rounded hover:bg-gray-300 rounded-full transition-all ease-in text-sm"
+        >
+          <FaBell />
+        </button>
+
+
       </div>
+      {notificationOpen ? <NotificationPanel /> : ''}
     </div>
   );
 };

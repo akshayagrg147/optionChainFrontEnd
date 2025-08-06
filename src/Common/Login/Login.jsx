@@ -1,20 +1,38 @@
+import axios from "axios";
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    if (email === "admin@gmail.com" && password === "admin@123") {
-      alert("✅ Login successful!");
-      setError("");
-    } else {
-      setError("❌ Invalid Email or Password");
-    }
+  const navigate = useNavigate()
+const handleLogin = (e) => {
+  e.preventDefault();
+  const data = {
+    email: email,
+    password: password
   };
+
+  axios.post(`${process.env.REACT_APP_BASE_URL}auth/login/`, data)
+    .then((res) => {
+      localStorage.setItem('access-token', res.data?.data?.access);
+      localStorage.setItem('refresh-token', res.data?.data?.refresh);
+      toast.success('Login Successfully');
+      navigate('/');
+    })
+    .catch((err) => {
+      console.error(err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.detail ||
+        "Login failed. Please check your credentials.";
+      toast.error(errorMessage);
+      setError(errorMessage); // Optional: if you want to still display it in the component
+    });
+};
+
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">

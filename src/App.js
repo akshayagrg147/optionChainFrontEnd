@@ -5,15 +5,52 @@ import { Route, Router, Routes } from "react-router-dom";
 import DashboardPage from "./Pages/DashboardPage";
 import LoginPage from "./Pages/LoginPage";
 import RegisterPage from "./Pages/RegisterPage";
+import SquareOff from "./components/SquareOff";
+import ManualTradeUI from "./components/ManualTradeUI";
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from "react-toastify";
+import PrivateRoute from "./components/PrivateRoute";
+import { ManualWebSocketProvider } from "./ManualWebSocketContext";
+
 
 function App() {
   return (
     <div>
-        <Routes>
-          <Route path="/" element={<DashboardPage/>}/>
-          <Route path="/login" element={<LoginPage/>}/>
-          <Route path="/register" element={<RegisterPage/>}/>
-        </Routes>
+      <ToastContainer />
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* Protected Routes */}
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <DashboardPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/square-off"
+          element={
+            <PrivateRoute>
+              <SquareOff />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manual-trade"
+          element={
+            <PrivateRoute>
+
+              <ManualWebSocketProvider>
+                <ManualTradeUI />
+              </ManualWebSocketProvider>
+            </PrivateRoute>
+          }
+        />
+      </Routes>
     </div>
   );
 }
