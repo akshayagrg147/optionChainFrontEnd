@@ -59,9 +59,10 @@ const DashboardPage = () => {
                 <Topbar />
                 <div className=" p-4 gap-4">
                     <div className=" space-y-4">
-                        <WebSocketProvider tradeData={data} setTradeData={setData} setReverseTrade={setReverseTrade}  setRtpValue={setRtpValue} >
+                        <WebSocketProvider tradeData={data} setTradeData={setData} reverseTrade={reverseTrade} setReverseTrade={setReverseTrade}  setRtpValue={setRtpValue} >
                             <TradeTable data={data} setData={setData} setReverseTrade={setReverseTrade} reverseTrade={reverseTrade} rtpValue={rtpValue} setRtpValue={setRtpValue}/>
-                            {/* <TradeTableSecond /> */}
+                            {reverseTrade ?
+                            <TradeTableSecond data={data} setData={setData}/>:''}
                             <MarketTable data={data} setData={setData} />
                         </WebSocketProvider>
                     </div>

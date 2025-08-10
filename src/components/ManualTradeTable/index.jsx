@@ -3,7 +3,7 @@ import { FaPencilAlt } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useManualWebSocketData } from "../../ManualWebSocketContext";
 
-const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice}) => {
+const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lockedBuyLtp,setLockedBuyLtp,buyLtp}) => {
   const [reverseTrade, setReverseTrade] = useState(false);
    const { socketData } = useManualWebSocketData();
   const [rtpValue, setRtpValue] = useState("");
@@ -20,7 +20,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice}) 
       ltpLocked: 1.32,
       status: "Inactive",
       pl: "3.25%",
-      buyInLTP: OrderPrice || 0,
+      buyInLTP: buyLtp || 0,
       liveInLTP: socketData?.ltp,
       active: false,
     },
@@ -36,7 +36,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice}) 
       ltpLocked: "Yes",
       status: "Inactive",
       pl: "-2.15%",
-      buyInLTP: OrderPrice || 0,
+      buyInLTP: buyLtp || 0,
       liveInLTP: socketData?.ltp,
       active: false,
     },
@@ -83,7 +83,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice}) 
               {/* <th className="px-4 py-2">Lot Size</th> */}
               {/* <th className="px-4 py-2">LTP Locked</th> */}
               {/* <th className="px-4 py-2">Status</th> */}
-              {/* <th className="px-4 py-2">P/L %</th> */}
+               <th className="px-4 py-2">P/L %</th>
               <th className="px-4 py-2">Buy In LTP</th>
               <th className="px-4 py-2">Live LTP</th>
               {/* <th className="px-4 py-2">Active</th> */}
@@ -209,7 +209,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice}) 
                     row.status
                   )}
                 </td> */}
-                {/* <td className="px-4 py-2">{row.pl}</td> */}
+                <td className="px-4 py-2">{row.pl}</td> 
                 <td className="px-4 py-2">{row.buyInLTP}</td>
                 <td className="px-4 py-2 text-green-500">{row.liveInLTP}</td>
                 {/* <td className="px-4 py-2">

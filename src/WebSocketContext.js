@@ -151,7 +151,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 
 const WebSocketContext = createContext();
 
-export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValue,setReverseTrade }) => {
+export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValue,setReverseTrade,reverseTrade }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -249,7 +249,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValu
           );
         }
         if (data.message === " Reverse token ...Order placed successfully...Waiting for square off") {
-           setReverseTrade(true);
+          //  setReverseTrade(true);
            console.log(data?.market_value,"data?.market_value");
            setRtpValue(data?.market_value)
         }
@@ -330,6 +330,10 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValu
           step: 0.25,
           profit_percent: 0.5,
           quantity: 75,
+          total_amount:10000,
+          investable_amount:10000,
+          lot:10,
+          reverseTrade:reverseTrade ? 'ON' : 'OFF'
         };
 
         try {

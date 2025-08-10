@@ -99,6 +99,8 @@ import axios from 'axios';
 const ManualTradeUI = () => {
   const [optionType, setOptionType] = useState("CE");
   const [instrument, setInstrument] = useState("Nifty Bank");
+  const [lockedBuyLtp,setLockedBuyLtp] = useState(false);
+  const [buyLtp,setBuyLtp] = useState(0)
   const [expiry, setExpiry] = useState("");
   const [strike, setStrike] = useState("");
   const [contactName, setContactName] = useState();
@@ -204,67 +206,119 @@ const ManualTradeUI = () => {
       alert("❌ Error occurred during Tracking List.");
     }
   };
-  const handleBuy = async () => {
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+const handleBuy = async () => {
+  
 
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
 
-    funds.forEach(async (fund, index) => {
-      const jsonData = {
-        quantity: 70,
-        instrument_token: instrumentKey,
-        access_token: fund.sandbox_token,
-        total_amount:fund?.funds,
-        investable_amount:fund?.investable_amount,
-      };
-      const response = await fetch(`${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(jsonData)
-      });
+  for (const fund of funds) {
+    const jsonData = {
+      quantity: 70,
+      instrument_token: instrumentKey,
+      access_token: fund.sandbox_token,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+    };
+
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
+        }
+      );
       const result = await response.json();
+
       if (response.ok) {
-        console.log(result, "result");
-        setOrderId(result.order_id)
-        setOrderPrice(result.price)
+        setOrderId(result.order_id);
+        setOrderPrice(result.price);
         toast.success(result?.message);
       } else {
-        alert("❌ Failed to Tracking.");
+        toast.error("❌ Failed to place Buy order.");
       }
-    })
+    } catch (err) {
+      console.error("❌ Buy API Error:", err);
+    }
   }
+};
 
+
+  // const handleSell = () => {
+  //   const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  //   if (funds.length === 0) return;
+
+
+  //   funds.forEach(async (fund, index) => {
+  //     const jsonData = {
+  //       quantity: 70,
+  //       instrument_token: instrumentKey,
+  //       access_token: fund.sandbox_token,
+  //       total_amount:fund?.funds,
+  //       investable_amount:fund?.investable_amount,
+  //     };
+  //     const response = await fetch(`${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`, {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json"
+  //       },
+  //       body: JSON.stringify(jsonData)
+  //     });
+  //     const result = await response.json();
+  //     if (response.ok) {
+  //       console.log(result, "result");
+  //       toast.success(result?.message)
+  //     } else {
+  //       alert("❌ Failed to Tracking.");
+  //     }
+  //   })
+  // }
   const handleSell = () => {
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
 
+  // 🔴 Close all active WebSocket connections before selling
+  socketsRef.current.forEach((ws) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.close();
+    }
+  });
+  socketsRef.current = []; // Clear references
 
-    funds.forEach(async (fund, index) => {
-      const jsonData = {
-        quantity: 70,
-        instrument_token: instrumentKey,
-        access_token: fund.sandbox_token,
-        total_amount:fund?.funds,
-        investable_amount:fund?.investable_amount,
-      };
-      const response = await fetch(`${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(jsonData)
-      });
+  funds.forEach(async (fund) => {
+    const jsonData = {
+      quantity: 70,
+      instrument_token: instrumentKey,
+      access_token: fund.sandbox_token,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+    };
+
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
+        }
+      );
+
       const result = await response.json();
       if (response.ok) {
         console.log(result, "result");
-        toast.success(result?.message)
+        toast.success(result?.message);
       } else {
-        alert("❌ Failed to Tracking.");
+        toast.error("❌ Failed to place Sell order.");
       }
-    })
-  }
+    } catch (error) {
+      console.error("❌ Sell API Error:", error);
+    }
+  });
+};
+
 useEffect(() => {
   if (instrumentKey) {
     countLtp();
@@ -389,6 +443,7 @@ function calculateAndStoreQuantities(ltp, lotSize) {
   const getFund = JSON.parse(localStorage.getItem('funds'))
   console.log(getFund,"✅ Updated funds with manualTradeQuantity saved.");
 }
+console.log(buyLtp,"buyLtp");
 
 
   return (
@@ -473,7 +528,7 @@ function calculateAndStoreQuantities(ltp, lotSize) {
 
       {socketData?.ltp && (
         <>
-          <ManualTradeTable expiry={expiry} optionType={optionType} instrument={instrument} handleSell={handleSell} OrderPrice={OrderPrice} />
+          <ManualTradeTable setLockedBuyLtp={setLockedBuyLtp} setBuyLtp={setBuyLtp} buyLtp={buyLtp} lockedBuyLtp={lockedBuyLtp} expiry={expiry} optionType={optionType} instrument={instrument} handleSell={handleSell} OrderPrice={OrderPrice} />
           <MarketWatchManual />
         </>
       )}
