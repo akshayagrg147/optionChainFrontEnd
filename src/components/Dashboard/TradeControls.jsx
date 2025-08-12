@@ -111,7 +111,60 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
         //       }
         //     : item;
         // });
-        const updatedData = data.map((item) => {
+        console.log(result, "result");
+
+        // const updatedData = data.map((item) => {
+        //   const matched = result.results.find(
+        //     (res) =>
+        //       res.name === item.instrument &&
+        //       res.expiry === item.dateOfContract &&
+        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+        //       res.strike === parseFloat(item.strikePrice)
+        //   );
+
+        //   if (matched) {
+        //     // Call countLtp here with matched instrument_key
+        //     countLtp(matched.instrument_key);
+
+        //     return {
+        //       ...item,
+        //       instrument_key: matched.instrument_key,
+        //       trading_symbol: matched.tradingsymbol,
+        //     };
+        //   }
+
+        //   return item;
+        // });
+        // const updatedData = data.map((item) => {
+        //   const matched = result.results.find(
+        //     (res) =>
+        //       res.name === item.instrument &&
+        //       res.expiry === item.dateOfContract &&
+        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+        //       res.strike === parseFloat(item.strikePrice)
+        //   );
+
+        //   if (matched) {
+        //     // Call countLtp here with matched instrument_key
+        //     countLtp(matched.instrument_key);
+
+        //     const isCE = matched.tradingsymbol.endsWith("CE");
+        //     const isPE = matched.tradingsymbol.endsWith("PE");
+
+        //     return {
+        //       ...item,
+        //       instrument_key: matched.instrument_key,
+        //       ...(isCE ? { trading_symbol: matched.tradingsymbol } : {}),
+        //       ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
+        //     };
+        //   }
+
+        //   return item;
+        // });
+        // console.log(updatedData,"updatedData");
+
+        // setData(updatedData);
+        let tempData = data.map((item) => {
           const matched = result.results.find(
             (res) =>
               res.name === item.instrument &&
@@ -121,19 +174,34 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
           );
 
           if (matched) {
-            // Call countLtp here with matched instrument_key
             countLtp(matched.instrument_key);
 
+            const isCE = matched.tradingsymbol.endsWith("CE");
+            const isPE = matched.tradingsymbol.endsWith("PE");
+
+            console.log(matched,"updatedData");
             return {
               ...item,
               instrument_key: matched.instrument_key,
-              trading_symbol: matched.tradingsymbol,
+              ...(isCE ? { trading_symbol: matched.tradingsymbol } : {}),
+              ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
             };
           }
 
           return item;
         });
+        console.log(tempData,"tempData");
+        
+        // Step 2: Ensure both CE and PE symbols exist on all items
+        const ceSymbol = tempData.find(item => item.trading_symbol)?.trading_symbol || "";
+        const peSymbol = tempData.find(item => item.trading_symbol_2)?.trading_symbol_2 || "";
 
+        const updatedData = tempData.map(item => ({
+          ...item,
+          trading_symbol: ceSymbol,
+          trading_symbol_2: peSymbol
+        }));
+        
         setData(updatedData);
       } else {
         alert('❌ Failed to track.');
@@ -145,7 +213,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   };
   const countLtp = async (instrument_key) => {
     const fundsData = JSON.parse(localStorage.getItem('funds'));
-    console.log(fundsData,"fundsData");
+    console.log(fundsData, "fundsData");
 
     const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
     const headers = {
@@ -194,7 +262,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
 
       if (!investableAmount || !lotSize) {
         console.error(`Invalid fund at index ${index}`);
-        return { ...fund, call_quantity: 0,put_quantity:0 };
+        return { ...fund, call_quantity: 0, put_quantity: 0 };
       }
 
       const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
@@ -269,15 +337,17 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                         type="number"
                         className="w-24 px-2 py-1 border rounded"
                         value={row.strikePrice}
-                       onChange={(e) => {
-                          const newValue = e.target.value;
-                          const updated = data.map((item, i) => {
-                            // Apply the change to all rows with same instrument
-                            if (item.strikePrice === row.strikePrice) {
-                              return { ...item, strikePrice: newValue };
-                            }
-                            return item;
-                          });
+                        onChange={(e) => {
+                          // const newValue = e.target.value;
+                          // const updated = data.map((item, i) => {
+                          //   // Apply the change to all rows with same instrument
+                          //   if (item.strikePrice === row.strikePrice) {
+                          //     return { ...item, strikePrice: newValue };
+                          //   }
+                          //   return item;
+                          // });
+                          const updated = [...data];
+                          updated[index].strikePrice = e.target.value;
                           setData(updated);
                         }}
                       />
@@ -291,7 +361,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                         type="date"
                         className="px-2 py-1 border rounded"
                         value={row.dateOfContract}
-                       onChange={(e) => {
+                        onChange={(e) => {
                           const newValue = e.target.value;
                           const updated = data.map((item, i) => {
                             // Apply the change to all rows with same instrument
@@ -334,7 +404,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                         type="number"
                         className="w-20 px-2 py-1 border rounded"
                         value={row.lotSize}
-                          onChange={(e) => {
+                        onChange={(e) => {
                           const newValue = e.target.value;
                           const updated = data.map((item, i) => {
                             // Apply the change to all rows with same instrument
@@ -369,7 +439,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                     ) : (
                       row.status
                     )} */}
-                     {row.status}
+                    {row.status}
                   </td>
                   <td className="px-4 py-2">{row.pl}</td>
                   <td className="px-4 py-2">{row.buyInLTP}</td>

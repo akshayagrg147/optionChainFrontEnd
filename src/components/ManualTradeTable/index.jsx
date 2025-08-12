@@ -3,9 +3,11 @@ import { FaPencilAlt } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useManualWebSocketData } from "../../ManualWebSocketContext";
 
-const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lockedBuyLtp,setLockedBuyLtp,buyLtp}) => {
+const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPrice, lockedBuyLtp, setLockedBuyLtp, buyLtp, setBuyLtp }) => {
+  // console.log(buyLtp, "buyLtpasd");
+
   const [reverseTrade, setReverseTrade] = useState(false);
-   const { socketData } = useManualWebSocketData();
+  const { socketData } = useManualWebSocketData();
   const [rtpValue, setRtpValue] = useState("");
   const [data, setData] = useState([
     {
@@ -19,8 +21,8 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
       lotSize: 50,
       ltpLocked: 1.32,
       status: "Inactive",
-      pl: "3.25%",
-      buyInLTP: buyLtp || 0,
+      pl: 0,
+      buyInLTP: buyLtp,
       liveInLTP: socketData?.ltp,
       active: false,
     },
@@ -35,12 +37,32 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
       lotSize: 25,
       ltpLocked: "Yes",
       status: "Inactive",
-      pl: "-2.15%",
-      buyInLTP: buyLtp || 0,
+      pl: 0,
+      buyInLTP: buyLtp,
       liveInLTP: socketData?.ltp,
       active: false,
     },
   ]);
+  useEffect(() => {
+    if (!buyLtp) return; // Prevents NaN or division by zero
+    const LtpData = data.find((obj) => {
+      if (obj.type === "CALL" && optionType === "CE") {
+        return obj
+      }
+      if (obj.type === "PUT" && optionType === "PE") {
+        return obj
+      }
+    })
+    setData((prev) =>
+      prev.map((item) => ({
+        ...item,
+        pl: buyLtp
+          ? (100 * (LtpData?.liveInLTP - buyLtp) / buyLtp).toFixed(2)
+          : 0
+      }))
+    );
+    console.log((100 * (LtpData?.liveInLTP - buyLtp) / buyLtp),buyLtp,"(100 * (LtpData?.liveInLTP - buyLtp) / buyLtp)")
+  }, [buyLtp, socketData.ltp, lockedBuyLtp]);
 
   useEffect(() => {
     if (!socketData?.type) return;
@@ -67,6 +89,28 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
     );
   }, [socketData]);
 
+  useEffect(() => {
+    if (lockedBuyLtp) {
+      const buyLtpData = data.find((obj) => {
+        if (obj.type === "CALL" && optionType === "CE") {
+          return obj
+        }
+        if (obj.type === "PUT" && optionType === "PE") {
+          return obj
+        }
+      })
+      console.log(buyLtpData, "buyLtpData");
+
+      setBuyLtp(buyLtpData?.liveInLTP);
+      setData((prev) =>
+        prev.map((item) => ({
+          ...item,
+          buyInLTP: buyLtpData?.liveInLTP
+        }))
+      );
+      setLockedBuyLtp(false)
+    }
+  }, [lockedBuyLtp == true])
 
   return (
     <>
@@ -83,7 +127,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
               {/* <th className="px-4 py-2">Lot Size</th> */}
               {/* <th className="px-4 py-2">LTP Locked</th> */}
               {/* <th className="px-4 py-2">Status</th> */}
-               <th className="px-4 py-2">P/L %</th>
+              <th className="px-4 py-2">P/L %</th>
               <th className="px-4 py-2">Buy In LTP</th>
               <th className="px-4 py-2">Live LTP</th>
               {/* <th className="px-4 py-2">Active</th> */}
@@ -91,14 +135,14 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
             </tr>
           </thead>
           <tbody className="text-gray-800">
-            {data.filter((obj)=>{
+            {data.filter((obj) => {
               if (obj.type === "CALL" && optionType === "CE") {
-                  return obj
+                return obj
               }
               if (obj.type === "PUT" && optionType === "PE") {
                 return obj
               }
-            } ).map((row, index) => (
+            }).map((row, index) => (
               <tr key={index} className="border-t">
                 <td className="px-4 py-2">{row.type}</td>
                 <td className="px-4 py-2">
@@ -209,7 +253,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
                     row.status
                   )}
                 </td> */}
-                <td className="px-4 py-2">{row.pl}</td> 
+                <td className="px-4 py-2">{row.pl}</td>
                 <td className="px-4 py-2">{row.buyInLTP}</td>
                 <td className="px-4 py-2 text-green-500">{row.liveInLTP}</td>
                 {/* <td className="px-4 py-2">
@@ -240,9 +284,9 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
                     <FaPencilAlt />
                   </button> */}
                   {/* <Link to="/manual-trade"> */}
-                    <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded" onClick={()=>handleSell()}>
-                      Square Off
-                    </button>
+                  <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded" onClick={() => handleSell()}>
+                    Square Off
+                  </button>
                   {/* </Link> */}
                 </td>
               </tr>
@@ -251,7 +295,7 @@ const ManualTradeTable = ({expiry,optionType,instrument,handleSell,OrderPrice,lo
         </table>
       </div>
 
-    
+
     </>
   );
 };

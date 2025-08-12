@@ -99,8 +99,8 @@ import axios from 'axios';
 const ManualTradeUI = () => {
   const [optionType, setOptionType] = useState("CE");
   const [instrument, setInstrument] = useState("Nifty Bank");
-  const [lockedBuyLtp,setLockedBuyLtp] = useState(false);
-  const [buyLtp,setBuyLtp] = useState(0)
+  const [lockedBuyLtp, setLockedBuyLtp] = useState(false);
+  const [buyLtp, setBuyLtp] = useState(0)
   const [expiry, setExpiry] = useState("");
   const [strike, setStrike] = useState("");
   const [contactName, setContactName] = useState();
@@ -206,44 +206,44 @@ const ManualTradeUI = () => {
       alert("❌ Error occurred during Tracking List.");
     }
   };
-const handleBuy = async () => {
-  
+  const handleBuy = async () => {
+    
+setLockedBuyLtp(true)
+    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+    if (funds.length === 0) return;
 
-  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-  if (funds.length === 0) return;
+    for (const fund of funds) {
+      const jsonData = {
+        quantity: instrument === "NIFTY" ? 75 : 70,
+        instrument_token: instrumentKey,
+        access_token: fund.sandbox_token,
+        total_amount: fund?.funds,
+        investable_amount: fund?.investable_amount,
+      };
 
-  for (const fund of funds) {
-    const jsonData = {
-      quantity: 70,
-      instrument_token: instrumentKey,
-      access_token: fund.sandbox_token,
-      total_amount: fund?.funds,
-      investable_amount: fund?.investable_amount,
-    };
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(jsonData),
+          }
+        );
+        const result = await response.json();
 
-    try {
-      const response = await fetch(
-        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(jsonData),
+        if (response.ok) {
+          setOrderId(result.order_id);
+          setOrderPrice(result.price);
+          toast.success(result?.message);
+        } else {
+          toast.error("❌ Failed to place Buy order.");
         }
-      );
-      const result = await response.json();
-
-      if (response.ok) {
-        setOrderId(result.order_id);
-        setOrderPrice(result.price);
-        toast.success(result?.message);
-      } else {
-        toast.error("❌ Failed to place Buy order.");
+      } catch (err) {
+        console.error("❌ Buy API Error:", err);
       }
-    } catch (err) {
-      console.error("❌ Buy API Error:", err);
     }
-  }
-};
+  };
 
 
   // const handleSell = () => {
@@ -276,174 +276,174 @@ const handleBuy = async () => {
   //   })
   // }
   const handleSell = () => {
-  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-  if (funds.length === 0) return;
+    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+    if (funds.length === 0) return;
 
-  // 🔴 Close all active WebSocket connections before selling
-  socketsRef.current.forEach((ws) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.close();
+    // 🔴 Close all active WebSocket connections before selling
+    socketsRef.current.forEach((ws) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
+    socketsRef.current = []; // Clear references
+
+    funds.forEach(async (fund) => {
+      const jsonData = {
+        quantity: instrument === "NIFTY" ? 75 : 70,
+        instrument_token: instrumentKey,
+        access_token: fund.sandbox_token,
+        total_amount: fund?.funds,
+        investable_amount: fund?.investable_amount,
+      };
+
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(jsonData),
+          }
+        );
+
+        const result = await response.json();
+        if (response.ok) {
+          console.log(result, "result");
+          toast.success(result?.message);
+        } else {
+          toast.error("❌ Failed to place Sell order.");
+        }
+      } catch (error) {
+        console.error("❌ Sell API Error:", error);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (instrumentKey) {
+      countLtp();
     }
-  });
-  socketsRef.current = []; // Clear references
+  }, [instrumentKey]);
 
-  funds.forEach(async (fund) => {
-    const jsonData = {
-      quantity: 70,
-      instrument_token: instrumentKey,
-      access_token: fund.sandbox_token,
-      total_amount: fund?.funds,
-      investable_amount: fund?.investable_amount,
+  const countLtp = async () => {
+    const fund = JSON.parse(localStorage.getItem('funds'))
+    const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrumentKey}`;
+    const headers = {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${fund[0]?.token}` // keep secure
     };
 
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(jsonData),
-        }
-      );
+      const response = await axios.get(url, { headers });
+      const data = response.data?.data;
 
-      const result = await response.json();
-      if (response.ok) {
-        console.log(result, "result");
-        toast.success(result?.message);
+      if (data) {
+        const firstKey = Object.keys(data)[0];
+        const lastPrice = data[firstKey]?.last_price;
+
+        if (lotSizeState && lastPrice > 0) {
+          calculateAndStoreQuantities(lastPrice, lotSizeState);
+        } else {
+          console.warn("Missing lotSizeState or invalid LTP.");
+        }
+
       } else {
-        toast.error("❌ Failed to place Sell order.");
+        console.error('No data returned from LTP API');
       }
     } catch (error) {
-      console.error("❌ Sell API Error:", error);
+      console.error('Error fetching LTP:', error.response?.data || error.message);
     }
-  });
-};
-
-useEffect(() => {
-  if (instrumentKey) {
-    countLtp();
-  }
-}, [instrumentKey]);
-
-const countLtp = async () => {
-  const fund = JSON.parse(localStorage.getItem('funds'))
-  const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrumentKey}`;
-  const headers = {
-    'Accept': 'application/json',
-    'Authorization': `Bearer ${fund[0]?.token}` // keep secure
   };
 
-  try {
-    const response = await axios.get(url, { headers });
-    const data = response.data?.data;
 
-    if (data) {
-      const firstKey = Object.keys(data)[0];
-      const lastPrice = data[firstKey]?.last_price;
+  // function calculateAndStoreQuantities(ltp, lotSize) {
+  //   if (!ltp || !lotSize || ltp <= 0) {
+  //     console.error("Invalid LTP or lotSize");
+  //     return;
+  //   }
 
-      if (lotSizeState && lastPrice > 0) {
-        calculateAndStoreQuantities(lastPrice, lotSizeState);
-      } else {
-        console.warn("Missing lotSizeState or invalid LTP.");
+  //   const fundsRaw = localStorage.getItem("funds");
+  //   if (!fundsRaw) {
+  //     console.error("No funds found in localStorage");
+  //     return;
+  //   }
+
+  //   let funds;
+  //   try {
+  //     funds = JSON.parse(fundsRaw);
+  //   } catch (e) {
+  //     console.error("Failed to parse funds JSON:", e);
+  //     return;
+  //   }
+
+  //   const updatedFunds = funds.map((fund, index) => {
+  //     const investableAmount = parseFloat(fund.invest_amount);
+
+  //     if (!investableAmount || investableAmount <= 0) {
+  //       console.warn(`Invalid investableAmount for fund at index ${index}`);
+  //       return { ...fund, manualTradeQuantity: 0 };
+  //     }
+
+  //     const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
+  //     const quantity = numberOfLots * lotSize;
+
+  //     console.log(`[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`);
+
+  //     return {
+  //       ...fund,
+  //       manualTradeQuantity: quantity
+  //     };
+  //   });
+
+  //   localStorage.setItem("funds", JSON.stringify(updatedFunds));
+  //   console.log("✅ Updated funds with manualTradeQuantity saved.");
+  // }
+  function calculateAndStoreQuantities(ltp, lotSize) {
+    if (!ltp || !lotSize || ltp <= 0) {
+      console.error("Invalid LTP or lotSize");
+      return;
+    }
+
+    const fundsRaw = localStorage.getItem("funds");
+    if (!fundsRaw) {
+      console.error("No funds found in localStorage");
+      return;
+    }
+
+    let funds;
+    try {
+      funds = JSON.parse(fundsRaw);
+    } catch (e) {
+      console.error("Failed to parse funds JSON:", e);
+      return;
+    }
+
+    const updatedFunds = funds.map((fund, index) => {
+      const investableAmount = parseFloat(fund.invest_amount);
+
+      // ✅ Skip updating manualTradeQuantity if invest_amount is invalid
+      if (!investableAmount || investableAmount <= 0) {
+        console.warn(`Invalid investableAmount for fund at index ${index}, keeping existing quantity.`);
+        return fund; // Return unchanged fund object
       }
 
-    } else {
-      console.error('No data returned from LTP API');
-    }
-  } catch (error) {
-    console.error('Error fetching LTP:', error.response?.data || error.message);
+      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
+      const quantity = numberOfLots * lotSize;
+
+      console.log(`[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`);
+
+      return {
+        ...fund,
+        manualTradeQuantity: quantity
+      };
+    });
+    console.log(updatedFunds, "updatedFunds");
+
+    localStorage.setItem("funds", JSON.stringify(updatedFunds));
+    const getFund = JSON.parse(localStorage.getItem('funds'))
+    console.log(getFund, "✅ Updated funds with manualTradeQuantity saved.");
   }
-};
-
-
-// function calculateAndStoreQuantities(ltp, lotSize) {
-//   if (!ltp || !lotSize || ltp <= 0) {
-//     console.error("Invalid LTP or lotSize");
-//     return;
-//   }
-
-//   const fundsRaw = localStorage.getItem("funds");
-//   if (!fundsRaw) {
-//     console.error("No funds found in localStorage");
-//     return;
-//   }
-
-//   let funds;
-//   try {
-//     funds = JSON.parse(fundsRaw);
-//   } catch (e) {
-//     console.error("Failed to parse funds JSON:", e);
-//     return;
-//   }
-
-//   const updatedFunds = funds.map((fund, index) => {
-//     const investableAmount = parseFloat(fund.invest_amount);
-
-//     if (!investableAmount || investableAmount <= 0) {
-//       console.warn(`Invalid investableAmount for fund at index ${index}`);
-//       return { ...fund, manualTradeQuantity: 0 };
-//     }
-
-//     const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
-//     const quantity = numberOfLots * lotSize;
-
-//     console.log(`[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`);
-
-//     return {
-//       ...fund,
-//       manualTradeQuantity: quantity
-//     };
-//   });
-
-//   localStorage.setItem("funds", JSON.stringify(updatedFunds));
-//   console.log("✅ Updated funds with manualTradeQuantity saved.");
-// }
-function calculateAndStoreQuantities(ltp, lotSize) {
-  if (!ltp || !lotSize || ltp <= 0) {
-    console.error("Invalid LTP or lotSize");
-    return;
-  }
-
-  const fundsRaw = localStorage.getItem("funds");
-  if (!fundsRaw) {
-    console.error("No funds found in localStorage");
-    return;
-  }
-
-  let funds;
-  try {
-    funds = JSON.parse(fundsRaw);
-  } catch (e) {
-    console.error("Failed to parse funds JSON:", e);
-    return;
-  }
-
-  const updatedFunds = funds.map((fund, index) => {
-    const investableAmount = parseFloat(fund.invest_amount);
-
-    // ✅ Skip updating manualTradeQuantity if invest_amount is invalid
-    if (!investableAmount || investableAmount <= 0) {
-      console.warn(`Invalid investableAmount for fund at index ${index}, keeping existing quantity.`);
-      return fund; // Return unchanged fund object
-    }
-
-    const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
-    const quantity = numberOfLots * lotSize;
-
-    console.log(`[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`);
-
-    return {
-      ...fund,
-      manualTradeQuantity: quantity
-    };
-  });
-  console.log(updatedFunds,"updatedFunds");
-  
-  localStorage.setItem("funds", JSON.stringify(updatedFunds));
-  const getFund = JSON.parse(localStorage.getItem('funds'))
-  console.log(getFund,"✅ Updated funds with manualTradeQuantity saved.");
-}
-console.log(buyLtp,"buyLtp");
+  // console.log(buyLtp, "buyLtp");
 
 
   return (
@@ -486,7 +486,7 @@ console.log(buyLtp,"buyLtp");
               className="mt-1 w-full px-3 py-2 border rounded-md"
             />
           </div>
- <div>
+          <div>
             <label className="block text-sm font-medium text-gray-700">Lot Size</label>
             <input
               type="number"
@@ -504,7 +504,7 @@ console.log(buyLtp,"buyLtp");
               className="mt-1 w-full px-3 py-2 border rounded-md"
             />
           </div>
-         
+
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Contract Name</label>

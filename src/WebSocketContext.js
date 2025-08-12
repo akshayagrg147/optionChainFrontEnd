@@ -151,7 +151,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 
 const WebSocketContext = createContext();
 
-export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValue,setReverseTrade,reverseTrade }) => {
+export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -225,33 +225,52 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValu
         }
 
         // ✅ Handle success scenario
-        if (data.message === "Order placed successfully...Waiting for square off") {
+        if (data.message === "Order placed successfully...Waiting for square off" ) {
           setTradeData((prev) =>
             prev.map((item) =>
-              item.status === "Vigilant" ? { ...item, status: "Waiting for Square-Off" } : item
+              item.status === "Vigilant"
+                ? {
+                  ...item,
+                  status: "Waiting for Square-Off",
+                  buyInLTP: data?.ltp,
+                  pl: data?.ltp && data?.ltp !== 0
+                    ? (100 * ((data?.ltp - data?.ltp) / data?.ltp)) // Initially 0% since buy & live are same
+                    : 0
+                }
+                : item
             )
           );
+        }
+        // if (tradeData?.buyInLTP) {
+        //   setTradeData((prev) =>
+        //     prev.map((item) => ({
+        //       ...item,
+        //       pl: 100 * (data?.ltp - tradeData.buyInLTP) / tradeData.buyInLTP,
+
+        //     }))
+        //   );
+        // }
+        if (data?.locked_LTP ) {
           setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
-              ltpLocked: data?.ltp
+              ltpLocked: data?.locked_LTP,
             }))
           );
-
         }
-        if (data.message === "Token sell") {
-          
-            setTradeData((prev) =>
+        if (data.message === "Token sell" ) {
+
+          setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
               pl: data?.pnl_percent
             }))
           );
         }
-        if (data.message === " Reverse token ...Order placed successfully...Waiting for square off") {
+        if (data.message === " Reverse token ...Order placed successfully...Waiting for square off" ) {
           //  setReverseTrade(true);
-           console.log(data?.market_value,"data?.market_value");
-           setRtpValue(data?.market_value)
+          console.log(data?.market_value, "data?.market_value");
+          setRtpValue(data?.market_value)
         }
 
         // ✅ Update data states
@@ -323,17 +342,17 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData,setRtpValu
           instrument_key: "NSE_INDEX|Nifty 50",
           expiry_date: trade.dateOfContract || "2025-07-24",
           access_token: user.token,
-          trading_symbol: trade.trading_symbol || "NIFTY2572425000CE",
-          trading_symbol_2: trade.trading_symbol || "NIFTY2572425000PE",
+          trading_symbol: trade.trading_symbol ? trade.trading_symbol : "",
+          trading_symbol_2: trade.trading_symbol_2 ? trade.trading_symbol_2 : "NIFTY2572425000PE",
           target_market_price_CE: trade.targetMarketCE ?? 0,
           target_market_price_PE: trade.targetMarketPE ?? 0,
           step: 0.25,
           profit_percent: 0.5,
           quantity: 75,
-          total_amount:10000,
-          investable_amount:10000,
-          lot:10,
-          reverseTrade:reverseTrade ? 'ON' : 'OFF'
+          total_amount: 10000,
+          investable_amount: 10000,
+          lot: 10,
+          reverseTrade: reverseTrade ? 'ON' : 'OFF'
         };
 
         try {
