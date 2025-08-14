@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import NotificationPanel from "../../Common/Notification";
 import { FaBell } from "react-icons/fa";
 
@@ -9,7 +9,7 @@ const Topbar = () => {
   const handleNotificationClick = () => {
     setNotificationOpen(!notificationOpen); // Only open on click
   };
-
+  const navigate = useNavigate();
   // 🧠 Close when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -31,7 +31,13 @@ const Topbar = () => {
   const handleEmergencyClick = () => {
     alert("Emergency Square-Off triggered!");
   };
-
+  const handleLogout = () => {
+    localStorage.removeItem('access-token');
+    const token = localStorage.getItem('access-token');
+    if (!token) {
+      return navigate('/login')
+    }
+  }
   return (
     <div className="bg-white px-6 py-3 shadow-sm border-b border-gray-200 flex justify-between items-center">
       {/* Left Side Buttons */}
@@ -48,9 +54,9 @@ const Topbar = () => {
           </button>
         </Link>
         <Link to={'/manual-trade'}>
-        <button className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 text-sm">
-          Manual Trade Setup
-        </button>
+          <button className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 text-sm">
+            Manual Trade Setup
+          </button>
         </Link>
         <button className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm">
           Settings
@@ -73,6 +79,12 @@ const Topbar = () => {
           className=" px-2 py-2 rounded hover:bg-gray-300 rounded-full transition-all ease-in text-sm"
         >
           <FaBell />
+        </button>
+        <button
+          onClick={() => handleLogout()}
+          className=" px-2 py-2 rounded hover:bg-gray-300 rounded-full transition-all ease-in text-sm"
+        >
+          Logout
         </button>
 
 

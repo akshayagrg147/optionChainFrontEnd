@@ -39,47 +39,50 @@ const Sidebar = () => {
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
-const fetchAccounts = async () => {
-  try {
-    const res = await axios.get(`${process.env.REACT_APP_BASE_URL}fund-instrument/`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('access-token')}`,
-      },
-    });
+  const fetchAccounts = async () => {
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_BASE_URL}fund-instrument/`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('access-token')}`,
+        },
+      });
 
-    if (res.data.length === 0) {
-      setIsOpenPopup(true);
-    } else {
-      const fundsData = res.data.map((f, i) => ({
-        id: i + 1,
-        name: f.name,
-        token: f.token,
-        lotSize: '',
-        invest_amount: '',
-        sandBoxToken: f['sanbox token'],
+      if (res.data.length === 0) {
+        setIsOpenPopup(true);
+      } else {
+        console.log(res.data, "res.data");
+
+        const fundsData = res.data.map((f, i) => ({
+          id: i + 1,
+          name: f.name,
+          token: f.token,
+          lotSize: '',
+          invest_amount: '',
+          percentage: parseInt(f?.percentage),
+          sandBoxToken: f['sanbox token'],
+          status: 'Pending',
+        }));
+        localStorage.setItem('funds', JSON.stringify(fundsData));
+      }
+
+      const openState = {};
+      res.data.forEach((acc) => {
+        openState[acc.id] = true;
+      });
+
+      setAccordionOpen(openState);
+      setAccounts(res.data.map((acc) => ({
+        ...acc,
         status: 'Pending',
-      }));
-      localStorage.setItem('funds', JSON.stringify(fundsData));
+      })));
+    } catch (err) {
+      console.error("API error:", err);
     }
+  };
 
-    const openState = {};
-    res.data.forEach((acc) => {
-      openState[acc.id] = true;
-    });
-
-    setAccordionOpen(openState);
-    setAccounts(res.data.map((acc) => ({
-      ...acc,
-      status: 'Pending',
-    })));
-  } catch (err) {
-    console.error("API error:", err);
-  }
-};
-
-useEffect(() => {
-  fetchAccounts().then(fundCheck);
-}, []);
+  useEffect(() => {
+    fetchAccounts().then(fundCheck);
+  }, []);
 
 
   useEffect(() => {
@@ -100,59 +103,98 @@ useEffect(() => {
     localStorage.setItem("funds", JSON.stringify(updatedFunds));
   }, [accounts]);
 
-const fundCheck = async () => {
-  const storedFunds = JSON.parse(localStorage.getItem('funds') || '[]');
-  console.log(storedFunds, "storedFunds");
+  const fundCheck = async () => {
+    const storedFunds = JSON.parse(localStorage.getItem('funds') || '[]');
 
-  if (!storedFunds.length) {
-    toast.error("No funds found in local storage.");
-    return;
-  }
+    if (!storedFunds.length) {
+      toast.error("No funds found in local storage.");
+      return;
+    }
 
-  const updatedFunds = [];
+    const updatedFunds = [];
+    let updatedAccounts = [...storedFunds]; // work with a local copy
 
-  for (const fund of storedFunds) {
-    try {
-      const res = await axios.get(`${process.env.REACT_APP_BASE_URL}api/upstox/funds/`, {
-        headers: {
-          Authorization: `Bearer ${fund.token}`,
-        },
-      });
 
-      const fetchedFund = res.data;
-      const fundAmount = Number(fetchedFund.margins?.available_margin || 0);
-      const percentage = Number(
-        accounts.find((acc) => acc.name === fund.name)?.percentage || 0
-      );
-      const investableAmount = (fundAmount * percentage) / 100;
+    for (const fund of storedFunds) {
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_BASE_URL}api/upstox/funds/`, {
+          headers: {
+            Authorization: `Bearer ${fund.token}`,
+          },
+        });
 
-      // Update state
-      setAccounts((prev) =>
-        prev.map((acc) =>
-          acc.name === fund.name
-            ? {
+        const fetchedFund = res.data;
+        const fundAmount = Number(fetchedFund.margins?.available_margin || 0);
+        // setAccounts((prev) =>
+        //   prev.map((acc) => ({
+        //     ...acc,
+        //     name:  res?.data?.user_name
+        //   }))
+        // );
+        // console.log(accounts,fund, "accounts");
+
+        // const percentage = Number(
+        //   accounts.find((acc) => acc.name === fund.name)?.percentage || 0
+        // );
+        // const investableAmount = (fundAmount * percentage) / 100;
+        // console.log(investableAmount, percentage, "investableAmount");
+
+        // // Update state
+        // setAccounts((prev) =>
+        //   prev.map((acc) =>
+        //     acc.name === fund.name
+        //       ? {
+        //         ...acc,
+        //         funds: fundAmount,
+        //         investable_amount: investableAmount.toFixed(2),
+        //       }
+        //       : acc
+        //   )
+        // );
+
+        // // Prepare updated local storage item
+        // updatedFunds.push({
+        //   ...fund,
+        //   funds: fundAmount,
+        //   investable_amount: investableAmount.toFixed(2),
+        // });
+        setAccounts((prev) =>
+          prev.map((acc) =>
+            acc.token === fund.token
+              ? { ...acc, name: fetchedFund.user_name }
+              : acc
+          )
+        );
+
+        const percentage = Number(fund.percentage || 0);
+        const investableAmount = (fundAmount * percentage) / 100;
+        console.log(investableAmount, percentage, "investableAmount");
+
+        setAccounts((prev) =>
+          prev.map((acc) =>
+            acc.token === fund.token
+              ? {
                 ...acc,
                 funds: fundAmount,
                 investable_amount: investableAmount.toFixed(2),
               }
-            : acc
-        )
-      );
+              : acc
+          )
+        );
 
-      // Prepare updated local storage item
-      updatedFunds.push({
-        ...fund,
-        funds: fundAmount,
-        investable_amount: investableAmount.toFixed(2),
-      });
-    } catch (err) {
-      console.error(`Error fetching fund for ${fund.name}:`, err);
+        updatedFunds.push({
+          ...fund,
+          funds: fundAmount,
+          investable_amount: investableAmount.toFixed(2),
+        });
+      } catch (err) {
+        console.error(`Error fetching fund for ${fund.name}:`, err);
+      }
     }
-  }
 
-  // Update localStorage after all API calls
-  localStorage.setItem('funds', JSON.stringify(updatedFunds));
-};
+    // Update localStorage after all API calls
+    localStorage.setItem('funds', JSON.stringify(updatedFunds));
+  };
 
 
 
@@ -207,7 +249,8 @@ const fundCheck = async () => {
       await fetch(`${process.env.REACT_APP_BASE_URL}fund-instrument/${acc.id}/`, {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Authorization":`Bearer ${localStorage.getItem('access-token')}`
         },
         body: JSON.stringify({
           invest_amount: acc.invest_amount,
@@ -219,20 +262,20 @@ const fundCheck = async () => {
     }
     alert("Changes saved!");
   };
-const handleExportExcel = () => {
-  const exportData = accounts.map((acc) => ({
-    Name: acc.name,
-    fund: acc.funds ?? 0, // as you mentioned duplicate "fund"
-    investable_amount: acc.investable_amount || 0,
-    timestamp: new Date().toLocaleString(),
-  }));
+  const handleExportExcel = () => {
+    const exportData = accounts.map((acc) => ({
+      Name: acc.name,
+      fund: acc.funds ?? 0, // as you mentioned duplicate "fund"
+      investable_amount: acc.investable_amount || 0,
+      timestamp: new Date().toLocaleString(),
+    }));
 
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Funds");
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Funds");
 
-  XLSX.writeFile(workbook, "funds_export.xlsx");
-};
+    XLSX.writeFile(workbook, "funds_export.xlsx");
+  };
 
 
 
@@ -252,7 +295,7 @@ const handleExportExcel = () => {
             <button
               className="border-[1px] text-green-700 p-2 mr-4 hover:bg-gray-100 rounded-lg"
               // onClick={() => setIsOpenPopup(true)}
-              onClick={()=>handleExportExcel()}
+              onClick={() => handleExportExcel()}
             >
               <PiMicrosoftExcelLogo />
             </button>

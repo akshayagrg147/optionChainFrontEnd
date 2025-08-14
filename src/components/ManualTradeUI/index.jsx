@@ -108,6 +108,7 @@ const ManualTradeUI = () => {
   const [orderId, setOrderId] = useState();
   const [lotSizeState, setLotSizeState] = useState()
   const [OrderPrice, setOrderPrice] = useState();
+  const [realTrade, setRealTrade] = useState(true)
   const socketsRef = useRef([]);
 
   let manualQuantity = JSON.parse(localStorage.getItem('funds') || '[]')[0]?.manualTradeQuantity;
@@ -164,13 +165,15 @@ const ManualTradeUI = () => {
     };
   }, [instrument, expiry, strike, optionType, contactName]);
 
-  useEffect(() => {
-    if (!instrument || !expiry || !strike || !optionType) return;
-    handleGetToken()
-  }, [instrument, expiry, strike, optionType])
+  // useEffect(() => {
+  //   if (!instrument || !expiry || !strike || !optionType) return;
+  //   handleGetToken()
+  // }, [instrument, expiry, strike, optionType])
+
 
 
   const handleGetToken = async () => {
+    if (!instrument || !expiry || !strike || !optionType) return;
     const payload = {
       options: [
         {
@@ -207,43 +210,55 @@ const ManualTradeUI = () => {
     }
   };
   const handleBuy = async () => {
-    
-setLockedBuyLtp(true)
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+  setLockedBuyLtp(true);
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
 
-    for (const fund of funds) {
-      const jsonData = {
-        quantity: instrument === "NIFTY" ? 75 : 70,
-        instrument_token: instrumentKey,
-        access_token: fund.sandbox_token,
-        total_amount: fund?.funds,
-        investable_amount: fund?.investable_amount,
-      };
+  let allSuccess = null; // track if all orders succeeded
+  let message = '';
 
-      try {
-        const response = await fetch(
-          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jsonData),
-          }
-        );
-        const result = await response.json();
+  for (const fund of funds) {
+    const jsonData = {
+      quantity: fund?.manualTradeQuantity,
+      instrument_token: instrumentKey,
+      access_token: realTrade ? fund.token : fund.sandbox_token,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+    };
 
-        if (response.ok) {
-          setOrderId(result.order_id);
-          setOrderPrice(result.price);
-          toast.success(result?.message);
-        } else {
-          toast.error("❌ Failed to place Buy order.");
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
         }
-      } catch (err) {
-        console.error("❌ Buy API Error:", err);
+      );
+      const result = await response.json();
+
+      if (response.ok) {
+        setOrderId(result.order_id);
+        setOrderPrice(result.price);
+        allSuccess = true;
+        message = result?.message
+      } else {
+        allSuccess = false;
       }
+    } catch (err) {
+      allSuccess = false;
+      console.error("❌ Buy API Error:", err);
     }
-  };
+  }
+
+  // ✅ Toast only once after the loop
+  if (allSuccess) {
+    toast.success(message);
+  } else {
+    toast.error("❌ Failed to place one or more Buy orders.");
+  }
+};
+
 
 
   // const handleSell = () => {
@@ -289,9 +304,9 @@ setLockedBuyLtp(true)
 
     funds.forEach(async (fund) => {
       const jsonData = {
-        quantity: instrument === "NIFTY" ? 75 : 70,
+        quantity: fund?.manualTradeQuantity,
         instrument_token: instrumentKey,
-        access_token: fund.sandbox_token,
+        access_token: realTrade ? fund.token : fund.sandbox_token,
         total_amount: fund?.funds,
         investable_amount: fund?.investable_amount,
       };
@@ -356,6 +371,60 @@ setLockedBuyLtp(true)
   };
 
 
+
+  function calculateAndStoreQuantities(ltp, lotSize) {
+    if (!ltp || !lotSize || ltp <= 0) {
+      console.error("Invalid LTP or lotSize");
+      return;
+    }
+
+    const fundsRaw = localStorage.getItem("funds");
+    if (!fundsRaw) {
+      console.error("No funds found in localStorage");
+      return;
+    }
+
+    let funds;
+    try {
+      funds = JSON.parse(fundsRaw);
+    } catch (e) {
+      console.error("Failed to parse funds JSON:", e);
+      return;
+    }
+
+    const updatedFunds = funds.map((fund, index) => {
+      const investableAmount = realTrade ? parseFloat(fund?.investable_amount) : parseFloat(fund?.invest_amount);
+
+      if (isNaN(investableAmount) || investableAmount <= 0) {
+        console.warn(
+          `[${fund.name}] Invalid investableAmount for fund at index ${index}`
+        );
+        return { ...fund, manualTradeQuantity: 0 }; // ❌ Always reset to 0 if invalid
+      }
+      console.log(
+        `[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}`
+      );
+      const costPerLot = ltp * lotSize;
+      const numberOfLots = costPerLot > 0 ? Math.floor(investableAmount / costPerLot) : 0;
+      const quantity = numberOfLots * lotSize;
+      console.log(investableAmount / (ltp * lotSize), 'numberOfLots');
+
+      console.log(
+        `[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`
+      );
+
+      return {
+        ...fund,
+        manualTradeQuantity: quantity
+      };
+    });
+
+    localStorage.setItem("funds", JSON.stringify(updatedFunds));
+    console.log("✅ Updated funds with manualTradeQuantity:", updatedFunds);
+  }
+
+
+  // console.log(buyLtp, "buyLtp");
   // function calculateAndStoreQuantities(ltp, lotSize) {
   //   if (!ltp || !lotSize || ltp <= 0) {
   //     console.error("Invalid LTP or lotSize");
@@ -398,59 +467,26 @@ setLockedBuyLtp(true)
   //   localStorage.setItem("funds", JSON.stringify(updatedFunds));
   //   console.log("✅ Updated funds with manualTradeQuantity saved.");
   // }
-  function calculateAndStoreQuantities(ltp, lotSize) {
-    if (!ltp || !lotSize || ltp <= 0) {
-      console.error("Invalid LTP or lotSize");
-      return;
-    }
-
-    const fundsRaw = localStorage.getItem("funds");
-    if (!fundsRaw) {
-      console.error("No funds found in localStorage");
-      return;
-    }
-
-    let funds;
-    try {
-      funds = JSON.parse(fundsRaw);
-    } catch (e) {
-      console.error("Failed to parse funds JSON:", e);
-      return;
-    }
-
-    const updatedFunds = funds.map((fund, index) => {
-      const investableAmount = parseFloat(fund.invest_amount);
-
-      // ✅ Skip updating manualTradeQuantity if invest_amount is invalid
-      if (!investableAmount || investableAmount <= 0) {
-        console.warn(`Invalid investableAmount for fund at index ${index}, keeping existing quantity.`);
-        return fund; // Return unchanged fund object
-      }
-
-      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
-      const quantity = numberOfLots * lotSize;
-
-      console.log(`[${fund.name}] ➤ LTP: ${ltp}, LotSize: ${lotSize}, Investable: ${investableAmount}, Quantity: ${quantity}`);
-
-      return {
-        ...fund,
-        manualTradeQuantity: quantity
-      };
-    });
-    console.log(updatedFunds, "updatedFunds");
-
-    localStorage.setItem("funds", JSON.stringify(updatedFunds));
-    const getFund = JSON.parse(localStorage.getItem('funds'))
-    console.log(getFund, "✅ Updated funds with manualTradeQuantity saved.");
-  }
-  // console.log(buyLtp, "buyLtp");
-
 
   return (
     <div className="p-6 space-y-8">
       <div className="bg-white rounded-lg shadow-md p-6 w-full mx-auto">
         <h2 className="text-lg font-semibold mb-4">Manual Trade Setup</h2>
-
+        <div className=" gap-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Configure Trade</label>
+          <div
+            onClick={() => setRealTrade(!realTrade)}
+            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${realTrade ? 'bg-green-500' : 'bg-gray-300'}`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${realTrade ? 'left-[1.50rem]' : 'left-1'}`}
+            />
+          </div>
+          <p className='my-2'>
+            If this configure trade is set to <strong>"ON"</strong>, it will make a real trade.
+            If it is set to <strong>"OFF"</strong>, the trade will be a dry run.
+          </p>
+        </div>
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Underlying</label>
@@ -499,6 +535,7 @@ setLockedBuyLtp(true)
             <label className="block text-sm font-medium text-gray-700">Strike Price</label>
             <input
               type="text"
+              onBlur={handleGetToken}
               value={strike}
               onChange={(e) => setStrike(e.target.value)}
               className="mt-1 w-full px-3 py-2 border rounded-md"
