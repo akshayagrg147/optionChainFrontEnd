@@ -22,7 +22,7 @@ const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPri
       ltpLocked: 1.32,
       status: "Inactive",
       pl: 0,
-      buyInLTP: buyLtp,
+      buyInLTP: OrderPrice,
       liveInLTP: socketData?.ltp,
       active: false,
     },
@@ -38,13 +38,15 @@ const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPri
       ltpLocked: "Yes",
       status: "Inactive",
       pl: 0,
-      buyInLTP: buyLtp,
+      buyInLTP: OrderPrice,
       liveInLTP: socketData?.ltp,
       active: false,
     },
   ]);
+  console.log(data, "data");
+  
   useEffect(() => {
-    if (!buyLtp) return; // Prevents NaN or division by zero
+    if (!OrderPrice) return; // Prevents NaN or division by zero
     const LtpData = data.find((obj) => {
       if (obj.type === "CALL" && optionType === "CE") {
         return obj
@@ -56,13 +58,13 @@ const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPri
     setData((prev) =>
       prev.map((item) => ({
         ...item,
-        pl: buyLtp
-          ? (100 * (LtpData?.liveInLTP - buyLtp) / buyLtp).toFixed(2)
+        pl: OrderPrice
+          ? (100 * (LtpData?.liveInLTP - OrderPrice) / OrderPrice).toFixed(2)
           : 0
       }))
     );
-    console.log((100 * (LtpData?.liveInLTP - buyLtp) / buyLtp),buyLtp,"(100 * (LtpData?.liveInLTP - buyLtp) / buyLtp)")
-  }, [buyLtp, socketData.ltp, lockedBuyLtp]);
+    console.log((100 * (LtpData?.liveInLTP - OrderPrice) / OrderPrice),OrderPrice,"(100 * (LtpData?.liveInLTP - buyLtp) / buyLtp)")
+  }, [OrderPrice, socketData.ltp, lockedBuyLtp]);
 
   useEffect(() => {
     if (!socketData?.type) return;
@@ -101,11 +103,11 @@ const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPri
       })
       console.log(buyLtpData, "buyLtpData");
 
-      setBuyLtp(buyLtpData?.liveInLTP);
+      setBuyLtp(OrderPrice);
       setData((prev) =>
         prev.map((item) => ({
           ...item,
-          buyInLTP: buyLtpData?.liveInLTP
+          buyInLTP: OrderPrice
         }))
       );
       setLockedBuyLtp(false)

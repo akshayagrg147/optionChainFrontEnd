@@ -107,7 +107,7 @@ const ManualTradeUI = () => {
   const [instrumentKey, setInstrumentKey] = useState();
   const [orderId, setOrderId] = useState();
   const [lotSizeState, setLotSizeState] = useState()
-  const [OrderPrice, setOrderPrice] = useState();
+  const [OrderPrice, setOrderPrice] = useState(0);
   const [realTrade, setRealTrade] = useState(true)
   const socketsRef = useRef([]);
 
@@ -165,10 +165,10 @@ const ManualTradeUI = () => {
     };
   }, [instrument, expiry, strike, optionType, contactName]);
 
-  // useEffect(() => {
-  //   if (!instrument || !expiry || !strike || !optionType) return;
-  //   handleGetToken()
-  // }, [instrument, expiry, strike, optionType])
+  useEffect(() => {
+    if (!strike && !optionType) return;
+    handleGetToken()
+  }, [optionType])
 
 
 
@@ -210,54 +210,55 @@ const ManualTradeUI = () => {
     }
   };
   const handleBuy = async () => {
-  setLockedBuyLtp(true);
-  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-  if (funds.length === 0) return;
 
-  let allSuccess = null; // track if all orders succeeded
-  let message = '';
+    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+    if (funds.length === 0) return;
 
-  for (const fund of funds) {
-    const jsonData = {
+    let allSuccess = null; // track if all orders succeeded
+    let message = '';
+
+    for (const fund of funds) {
+      const jsonData = {
       quantity: fund?.manualTradeQuantity,
-      instrument_token: instrumentKey,
-      access_token: realTrade ? fund.token : fund.sandbox_token,
-      total_amount: fund?.funds,
-      investable_amount: fund?.investable_amount,
-    };
+        instrument_token: instrumentKey,
+        access_token: realTrade ? fund.token : fund.sandbox_token,
+        total_amount: fund?.funds,
+        investable_amount: fund?.investable_amount,
+      };
 
-    try {
-      const response = await fetch(
-        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(jsonData),
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(jsonData),
+          }
+        );
+        const result = await response.json();
+
+        if (response.ok) {
+          setLockedBuyLtp(true);
+          setOrderId(result.order_id);
+          setOrderPrice(result?.price);
+          allSuccess = true;
+          message = result?.message
+        } else {
+          allSuccess = false;
         }
-      );
-      const result = await response.json();
-
-      if (response.ok) {
-        setOrderId(result.order_id);
-        setOrderPrice(result.price);
-        allSuccess = true;
-        message = result?.message
-      } else {
+      } catch (err) {
         allSuccess = false;
+        console.error("❌ Buy API Error:", err);
       }
-    } catch (err) {
-      allSuccess = false;
-      console.error("❌ Buy API Error:", err);
     }
-  }
 
-  // ✅ Toast only once after the loop
-  if (allSuccess) {
-    toast.success(message);
-  } else {
-    toast.error("❌ Failed to place one or more Buy orders.");
-  }
-};
+    // ✅ Toast only once after the loop
+    if (allSuccess) {
+      toast.success(message);
+    } else {
+      toast.error("❌ Failed to place one or more Buy orders.");
+    }
+  };
 
 
 
@@ -565,7 +566,7 @@ const ManualTradeUI = () => {
 
       {socketData?.ltp && (
         <>
-          <ManualTradeTable setLockedBuyLtp={setLockedBuyLtp} setBuyLtp={setBuyLtp} buyLtp={buyLtp} lockedBuyLtp={lockedBuyLtp} expiry={expiry} optionType={optionType} instrument={instrument} handleSell={handleSell} OrderPrice={OrderPrice} />
+          <ManualTradeTable setLockedBuyLtp={setLockedBuyLtp} setBuyLtp={setBuyLtp} OrderPrice={OrderPrice} buyLtp={buyLtp} lockedBuyLtp={lockedBuyLtp} expiry={expiry} optionType={optionType} instrument={instrument} handleSell={handleSell} />
           <MarketWatchManual />
         </>
       )}
