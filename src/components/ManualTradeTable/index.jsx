@@ -3,7 +3,7 @@ import { FaPencilAlt } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useManualWebSocketData } from "../../ManualWebSocketContext";
 
-const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPrice, lockedBuyLtp, setLockedBuyLtp, buyLtp, setBuyLtp }) => {
+const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPrice, lockedBuyLtp, setLockedBuyLtp, buyLtp, setBuyLtp,sellOrderPrice }) => {
   // console.log(buyLtp, "buyLtpasd");
 
   const [reverseTrade, setReverseTrade] = useState(false);
@@ -45,26 +45,48 @@ const ManualTradeTable = ({ expiry, optionType, instrument, handleSell, OrderPri
   ]);
   console.log(data, "data");
   
+  // useEffect(() => {
+  //   if (!OrderPrice) return; // Prevents NaN or division by zero
+  //   const LtpData = data.find((obj) => {
+  //     if (obj.type === "CALL" && optionType === "CE") {
+  //       return obj
+  //     }
+  //     if (obj.type === "PUT" && optionType === "PE") {
+  //       return obj
+  //     }
+  //   })
+  //   setData((prev) =>
+  //     prev.map((item) => ({
+  //       ...item,
+  //       pl: OrderPrice
+  //         ? (100 * (LtpData?.liveInLTP - OrderPrice) / OrderPrice).toFixed(2)
+  //         : 0
+  //     }))
+  //   );
+  //   console.log((100 * (LtpData?.liveInLTP - OrderPrice) / OrderPrice),OrderPrice,"(100 * (LtpData?.liveInLTP - buyLtp) / buyLtp)")
+  // }, [OrderPrice, socketData.ltp, lockedBuyLtp]);
+
   useEffect(() => {
-    if (!OrderPrice) return; // Prevents NaN or division by zero
-    const LtpData = data.find((obj) => {
-      if (obj.type === "CALL" && optionType === "CE") {
-        return obj
-      }
-      if (obj.type === "PUT" && optionType === "PE") {
-        return obj
-      }
-    })
-    setData((prev) =>
-      prev.map((item) => ({
-        ...item,
-        pl: OrderPrice
-          ? (100 * (LtpData?.liveInLTP - OrderPrice) / OrderPrice).toFixed(2)
-          : 0
-      }))
-    );
-    console.log((100 * (LtpData?.liveInLTP - OrderPrice) / OrderPrice),OrderPrice,"(100 * (LtpData?.liveInLTP - buyLtp) / buyLtp)")
-  }, [OrderPrice, socketData.ltp, lockedBuyLtp]);
+  if (!OrderPrice) return;
+
+  const LtpData = data.find((obj) => {
+    if (obj.type === "CALL" && optionType === "CE") return obj;
+    if (obj.type === "PUT" && optionType === "PE") return obj;
+  });
+
+  const effectiveLtp = sellOrderPrice ?? LtpData?.liveInLTP; 
+  // 👆 if sellOrderPrice exists, freeze PNL using it
+
+  setData((prev) =>
+    prev.map((item) => ({
+      ...item,
+      pl: OrderPrice
+        ? (100 * ((effectiveLtp ?? 0) - OrderPrice) / OrderPrice).toFixed(2)
+        : 0,
+      liveInLTP: effectiveLtp // freeze last price in table
+    }))
+  );
+}, [OrderPrice, socketData.ltp, lockedBuyLtp, sellOrderPrice]);
 
   useEffect(() => {
     if (!socketData?.type) return;

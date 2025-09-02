@@ -108,7 +108,9 @@ const ManualTradeUI = () => {
   const [orderId, setOrderId] = useState();
   const [lotSizeState, setLotSizeState] = useState()
   const [OrderPrice, setOrderPrice] = useState(0);
-  const [realTrade, setRealTrade] = useState(true)
+  const [realTrade, setRealTrade] = useState(true);
+  const [sellOrderPrice, setSellOrderPrice] = useState();
+  const [sellSocket,setSellSocket] = useState()
   const socketsRef = useRef([]);
 
   let manualQuantity = JSON.parse(localStorage.getItem('funds') || '[]')[0]?.manualTradeQuantity;
@@ -296,12 +298,7 @@ const ManualTradeUI = () => {
     if (funds.length === 0) return;
 
     // 🔴 Close all active WebSocket connections before selling
-    socketsRef.current.forEach((ws) => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-    });
-    socketsRef.current = []; // Clear references
+    // Clear references
 
     funds.forEach(async (fund) => {
       const jsonData = {
@@ -326,6 +323,14 @@ const ManualTradeUI = () => {
         if (response.ok) {
           console.log(result, "result");
           toast.success(result?.message);
+          setSellOrderPrice(result?.price);
+
+          socketsRef.current.forEach((ws) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.close();
+            }
+          });
+          socketsRef.current = [];
         } else {
           toast.error("❌ Failed to place Sell order.");
         }
@@ -566,7 +571,7 @@ const ManualTradeUI = () => {
 
       {socketData?.ltp && (
         <>
-          <ManualTradeTable setLockedBuyLtp={setLockedBuyLtp} setBuyLtp={setBuyLtp} OrderPrice={OrderPrice} buyLtp={buyLtp} lockedBuyLtp={lockedBuyLtp} expiry={expiry} optionType={optionType} instrument={instrument} handleSell={handleSell} />
+          <ManualTradeTable sellOrderPrice={sellOrderPrice} setLockedBuyLtp={setLockedBuyLtp} setBuyLtp={setBuyLtp} OrderPrice={OrderPrice} buyLtp={buyLtp} lockedBuyLtp={lockedBuyLtp} expiry={expiry} optionType={optionType} instrument={instrument} handleSell={handleSell} />
           <MarketWatchManual />
         </>
       )}
