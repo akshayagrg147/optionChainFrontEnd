@@ -322,7 +322,7 @@ const handleBuy = async () => {
 
   // Step 2: Fire all requests in one synchronous pass
   const fireTimestamp = performance.now();
-  console.log(`🚀 All threads fired at ${new Date().toISOString(np)} ms`);
+  console.log(`🚀 All threads fired at ${new Date().toISOString()} ms`);
 
   const requests = prepared.map(({ request, index }) =>
     fetch(request)
