@@ -110,7 +110,7 @@ const ManualTradeUI = () => {
   const [OrderPrice, setOrderPrice] = useState(0);
   const [realTrade, setRealTrade] = useState(true);
   const [sellOrderPrice, setSellOrderPrice] = useState();
-  const [sellSocket,setSellSocket] = useState()
+  const [sellSocket, setSellSocket] = useState()
   const socketsRef = useRef([]);
 
   let manualQuantity = JSON.parse(localStorage.getItem('funds') || '[]')[0]?.manualTradeQuantity;
@@ -142,7 +142,7 @@ const ManualTradeUI = () => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log(`📩 WS Response [${index}]:`, data);
+          // console.log(`📩 WS Response [${index}]:`, data);
           setSocketData(data); // 🎯 Set via context
         } catch (error) {
           console.error(`❌ JSON parse error for token ${fund.token_id}`, error);
@@ -211,56 +211,56 @@ const ManualTradeUI = () => {
       alert("❌ Error occurred during Tracking List.");
     }
   };
-  const handleBuy = async () => {
+  // const handleBuy = async () => {
 
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+  //   const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  //   if (funds.length === 0) return;
 
-    let allSuccess = null; // track if all orders succeeded
-    let message = '';
+  //   let allSuccess = null; // track if all orders succeeded
+  //   let message = '';
 
-    for (const fund of funds) {
-      const jsonData = {
-      quantity: fund?.manualTradeQuantity,
-        instrument_token: instrumentKey,
-        access_token: realTrade ? fund.token : fund.sandbox_token,
-        total_amount: fund?.funds,
-        investable_amount: fund?.investable_amount,
-      };
+  //   for (const fund of funds) {
+  //     const jsonData = {
+  //     quantity: fund?.manualTradeQuantity,
+  //       instrument_token: instrumentKey,
+  //       access_token: realTrade ? fund.token : fund.sandbox_token,
+  //       total_amount: fund?.funds,
+  //       investable_amount: fund?.investable_amount,
+  //     };
 
-      try {
-        const response = await fetch(
-          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jsonData),
-          }
-        );
-        const result = await response.json();
+  //     try {
+  //       const response = await fetch(
+  //         `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
+  //         {
+  //           method: "POST",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify(jsonData),
+  //         }
+  //       );
+  //       const result = await response.json();
 
-        if (response.ok) {
-          setLockedBuyLtp(true);
-          setOrderId(result.order_id);
-          setOrderPrice(result?.price);
-          allSuccess = true;
-          message = result?.message
-        } else {
-          allSuccess = false;
-        }
-      } catch (err) {
-        allSuccess = false;
-        console.error("❌ Buy API Error:", err);
-      }
-    }
+  //       if (response.ok) {
+  //         setLockedBuyLtp(true);
+  //         setOrderId(result.order_id);
+  //         setOrderPrice(result?.price);
+  //         allSuccess = true;
+  //         message = result?.message
+  //       } else {
+  //         allSuccess = false;
+  //       }
+  //     } catch (err) {
+  //       allSuccess = false;
+  //       console.error("❌ Buy API Error:", err);
+  //     }
+  //   }
 
-    // ✅ Toast only once after the loop
-    if (allSuccess) {
-      toast.success(message);
-    } else {
-      toast.error("❌ Failed to place one or more Buy orders.");
-    }
-  };
+  //   // ✅ Toast only once after the loop
+  //   if (allSuccess) {
+  //     toast.success(message);
+  //   } else {
+  //     toast.error("❌ Failed to place one or more Buy orders.");
+  //   }
+  // };
 
 
 
@@ -293,52 +293,215 @@ const ManualTradeUI = () => {
   //     }
   //   })
   // }
-  const handleSell = () => {
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+const handleBuy = async () => {
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
 
-    // 🔴 Close all active WebSocket connections before selling
-    // Clear references
+  // Step 1: Prepare request configs (no network call yet)
+  const prepared = funds.map((fund, index) => {
+    const jsonData = {
+      quantity: fund?.manualTradeQuantity,
+      instrument_token: instrumentKey,
+      access_token: realTrade ? fund.token : fund.sandbox_token,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+    };
 
-    funds.forEach(async (fund) => {
-      const jsonData = {
-        quantity: fund?.manualTradeQuantity,
-        instrument_token: instrumentKey,
-        access_token: realTrade ? fund.token : fund.sandbox_token,
-        total_amount: fund?.funds,
-        investable_amount: fund?.investable_amount,
-      };
+    return {
+      index,
+      request: new Request(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
+        }
+      ),
+    };
+  });
 
-      try {
-        const response = await fetch(
-          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jsonData),
-          }
-        );
+  // Step 2: Fire all requests in one synchronous pass
+  const fireTimestamp = performance.now();
+  console.log(`🚀 All threads fired at ${new Date().toISOString(np)} ms`);
 
+  const requests = prepared.map(({ request, index }) =>
+    fetch(request)
+      .then(async (response) => {
         const result = await response.json();
         if (response.ok) {
-          console.log(result, "result");
+          console.log(
+            `✅ Thread-${index + 1} resolved at ${performance.now().toFixed(
+              3
+            )} ms | Order ID: ${result.order_id}`
+          );
+          return {
+            success: true,
+            message: result?.message,
+            order_id: result?.order_id,
+            price: result?.price,
+          };
+        } else {
+          console.log(
+            `❌ Thread-${index + 1} failed at ${performance.now().toFixed(3)} ms`
+          );
+          return { success: false };
+        }
+      })
+      .catch((err) => {
+        console.error(
+          `🔥 Thread-${index + 1} error at ${performance.now().toFixed(3)} ms:`,
+          err
+        );
+        return { success: false };
+      })
+  );
+
+  // Step 3: Wait for all
+  const results = await Promise.all(requests);
+
+  // ✅ First success
+  const resultData = results.find((r) => r.success);
+  if (resultData) {
+    setLockedBuyLtp(true);
+    setOrderId(resultData.order_id);
+    setOrderPrice(resultData.price);
+    console.log(resultData, "✅ Chosen result for UI update");
+  }
+
+  // ✅ Overall status
+  const allSuccess = results.every((r) => r.success);
+  if (allSuccess) {
+    toast.success(resultData?.message || "All orders placed successfully!");
+  } else {
+    toast.error("❌ Failed to place one or more Buy orders.");
+  }
+};
+
+
+
+
+
+  // const handleSell = () => {
+  //   const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  //   if (funds.length === 0) return;
+
+  //   // 🔴 Close all active WebSocket connections before selling
+  //   // Clear references
+
+  //   funds.forEach(async (fund) => {
+  //     const jsonData = {
+  //       quantity: fund?.manualTradeQuantity,
+  //       instrument_token: instrumentKey,
+  //       access_token: fund.sandbox_token,
+  //       total_amount: fund?.funds,
+  //       investable_amount: fund?.investable_amount,
+  //     };
+
+  //     try {
+  //       const response = await fetch(
+  //         `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
+  //         {
+  //           method: "POST",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify(jsonData),
+  //         }
+  //       );
+
+  //       const result = await response.json();
+  //       if (response.ok) {
+  //         console.log(result, "result");
+  //         toast.success(result?.message);
+  //         setSellOrderPrice(result?.price);
+
+  //         socketsRef.current.forEach((ws) => {
+  //           if (ws && ws.readyState === WebSocket.OPEN) {
+  //             ws.close();
+  //           }
+  //         });
+  //         socketsRef.current = [];
+  //       } else {
+  //         toast.error("❌ Failed to place Sell order.");
+  //       }
+  //     } catch (error) {
+  //       console.error("❌ Sell API Error:", error);
+  //     }
+  //   });
+  // };
+
+  const handleSell = async () => {
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
+
+  // Step 1: Prepare all requests
+  const prepared = funds.map((fund, index) => {
+    const jsonData = {
+      quantity: fund?.manualTradeQuantity,
+      instrument_token: instrumentKey,
+      access_token: realTrade ? fund.token : fund.sandbox_token,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+    };
+
+    return {
+      index,
+      request: new Request(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
+        }
+      ),
+    };
+  });
+
+  // Step 2: Fire them *all at once*
+  const fireTimestamp = performance.now();
+  console.log(`🚀 All SELL threads fired at ${fireTimestamp.toFixed(3)} ms`);
+
+  const requests = prepared.map(({ request, index }) =>
+    fetch(request)
+      .then(async (response) => {
+        const result = await response.json();
+        if (response.ok) {
+          console.log(
+            `✅ Thread-${index + 1} resolved at ${performance.now().toFixed(3)} ms | Order ID: ${result.order_id}`
+          );
           toast.success(result?.message);
           setSellOrderPrice(result?.price);
 
+          // Close sockets once on first success
           socketsRef.current.forEach((ws) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.close();
             }
           });
           socketsRef.current = [];
+
+          return { success: true, result };
         } else {
+          console.log(
+            `❌ Thread-${index + 1} failed at ${performance.now().toFixed(3)} ms`
+          );
           toast.error("❌ Failed to place Sell order.");
+          return { success: false };
         }
-      } catch (error) {
-        console.error("❌ Sell API Error:", error);
-      }
-    });
-  };
+      })
+      .catch((err) => {
+        console.error(
+          `🔥 Thread-${index + 1} error at ${performance.now().toFixed(3)} ms:`,
+          err
+        );
+        return { success: false };
+      })
+  );
+
+  // Step 3: Wait for all
+  const results = await Promise.all(requests);
+
+  // You can inspect results here if needed
+  console.log("All sell requests completed:", results);
+};
 
   useEffect(() => {
     if (instrumentKey) {
