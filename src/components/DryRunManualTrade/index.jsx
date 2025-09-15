@@ -95,9 +95,8 @@ import MarketWatchManual from '../MarketWatchManual';
 import { useManualWebSocketData } from '../../ManualWebSocketContext';
 import { toast } from 'react-toastify';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
 
-const ManualTradeUI = () => {
+const DryManualTradeUI = () => {
   const [optionType, setOptionType] = useState("CE");
   const [instrument, setInstrument] = useState("Nifty Bank");
   const [lockedBuyLtp, setLockedBuyLtp] = useState(false);
@@ -294,87 +293,90 @@ const ManualTradeUI = () => {
   //     }
   //   })
   // }
-  const handleBuy = async () => {
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+const handleBuy = async () => {
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
 
-    // Step 1: Prepare request configs (no network call yet)
-    const prepared = funds.map((fund, index) => {
-      const jsonData = {
-        quantity: fund?.manualTradeQuantity,
-        instrument_token: instrumentKey,
-        access_token: fund.token,
-        total_amount: fund?.funds,
-        investable_amount: fund?.investable_amount,
-      };
+  // Step 1: Prepare request configs (no network call yet)
+  const prepared = funds.map((fund, index) => {
+    const jsonData = {
+      quantity: fund?.manualTradeQuantity,
+      instrument_token: instrumentKey,
+      access_token:fund.token,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+      sandbox_token:fund.sandbox_token
+    };
 
-      return {
-        index,
-        request: new Request(
-          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jsonData),
-          }
-        ),
-      };
-    });
+    return {
+      index,
+      request: new Request(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-buy/testing/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
+        }
+      ),
+    };
+  });
 
-    // Step 2: Fire all requests in one synchronous pass
-    const fireTimestamp = performance.now();
-    console.log(`🚀 All threads fired at ${new Date().toISOString()} ms`);
+  // Step 2: Fire all requests in one synchronous pass
+  const fireTimestamp = performance.now();
+  console.log(`🚀 All threads fired at ${new Date().toISOString()} ms`);
 
-    const requests = prepared.map(({ request, index }) =>
-      fetch(request)
-        .then(async (response) => {
-          const result = await response.json();
-          if (response.ok) {
-            console.log(
-              `✅ Thread-${index + 1} resolved at ${performance.now().toFixed(3)} ms | Order ID: ${result.order_id}`
-            );
-            return {
-              success: true,
-              message: result?.message,
-              order_id: result?.order_id,
-              price: result?.price,
-            };
-          } else {
-            console.log(
-              `❌ Thread-${index + 1} failed at ${performance.now().toFixed(3)} ms`
-            );
-            return { success: false };
-          }
-        })
-        .catch((err) => {
-          console.error(
-            `🔥 Thread-${index + 1} error at ${performance.now().toFixed(3)} ms:`,
-            err
+  const requests = prepared.map(({ request, index }) =>
+    fetch(request)
+      .then(async (response) => {
+        const result = await response.json();
+        if (response.ok) {
+          console.log(
+            `✅ Thread-${index + 1} resolved at ${performance.now().toFixed(
+              3
+            )} ms | Order ID: ${result.order_id}`
+          );
+          return {
+            success: true,
+            message: result?.message,
+            order_id: result?.order_id,
+            price: result?.price,
+          };
+        } else {
+          console.log(
+            `❌ Thread-${index + 1} failed at ${performance.now().toFixed(3)} ms`
           );
           return { success: false };
-        })
-    );
+        }
+      })
+      .catch((err) => {
+        console.error(
+          `🔥 Thread-${index + 1} error at ${performance.now().toFixed(3)} ms:`,
+          err
+        );
+        return { success: false };
+      })
+  );
 
-    // Step 3: Wait for all
-    const results = await Promise.all(requests);
+  // Step 3: Wait for all
+  const results = await Promise.all(requests);
 
-    // ✅ First success
-    const resultData = results.find((r) => r.success);
-    if (resultData) {
-      setLockedBuyLtp(true);
-      setOrderId(resultData.order_id);
-      setOrderPrice(resultData.price);
-      console.log(resultData, "✅ Chosen result for UI update");
-    }
+  // ✅ First success
+  const resultData = results.find((r) => r.success);
+  if (resultData) {
+    setLockedBuyLtp(true);
+    setOrderId(resultData.order_id);
+    setOrderPrice(resultData.price);
+    console.log(resultData, "✅ Chosen result for UI update");
+  }
 
-    // ✅ Overall status
-    const allSuccess = results.every((r) => r.success);
-    if (allSuccess) {
-      toast.success(resultData?.message || "All orders placed successfully!");
-    } else {
-      toast.error("❌ Failed to place one or more Buy orders.");
-    }
-  };
+  // ✅ Overall status
+  const allSuccess = results.every((r) => r.success);
+  if (allSuccess) {
+    toast.success(resultData?.message || "All orders placed successfully!");
+  } else {
+    toast.error("❌ Failed to place one or more Buy orders.");
+  }
+};
 
 
 
@@ -428,79 +430,80 @@ const ManualTradeUI = () => {
   // };
 
   const handleSell = async () => {
-    const funds = JSON.parse(localStorage.getItem("funds") || "[]");
-    if (funds.length === 0) return;
+  const funds = JSON.parse(localStorage.getItem("funds") || "[]");
+  if (funds.length === 0) return;
 
-    // Step 1: Prepare all requests
-    const prepared = funds.map((fund, index) => {
-      const jsonData = {
-        quantity: fund?.manualTradeQuantity,
-        instrument_token: instrumentKey,
-        access_token: realTrade ? fund.token : fund.sandbox_token,
-        total_amount: fund?.funds,
-        investable_amount: fund?.investable_amount,
-      };
+  // Step 1: Prepare all requests
+  const prepared = funds.map((fund, index) => {
+    const jsonData = {
+      quantity: fund?.manualTradeQuantity,
+      instrument_token: instrumentKey,
+      access_token:  fund.token ,
+      total_amount: fund?.funds,
+      investable_amount: fund?.investable_amount,
+      sandbox_token:fund.sandbox_token
+    };
 
-      return {
-        index,
-        request: new Request(
-          `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jsonData),
-          }
-        ),
-      };
-    });
+    return {
+      index,
+      request: new Request(
+        `${process.env.REACT_APP_BASE_URL}ManualTrade/api/place-upstox-order-sell/testing/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonData),
+        }
+      ),
+    };
+  });
 
-    // Step 2: Fire them *all at once*
-    const fireTimestamp = performance.now();
-    console.log(`🚀 All SELL threads fired at ${fireTimestamp.toFixed(3)} ms`);
+  // Step 2: Fire them *all at once*
+  const fireTimestamp = performance.now();
+  console.log(`🚀 All SELL threads fired at ${fireTimestamp.toFixed(3)} ms`);
 
-    const requests = prepared.map(({ request, index }) =>
-      fetch(request)
-        .then(async (response) => {
-          const result = await response.json();
-          if (response.ok) {
-            console.log(
-              `✅ Thread-${index + 1} resolved at ${performance.now().toFixed(3)} ms | Order ID: ${result.order_id}`
-            );
-            toast.success(result?.message);
-            setSellOrderPrice(result?.price);
-
-            // Close sockets once on first success
-            socketsRef.current.forEach((ws) => {
-              if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.close();
-              }
-            });
-            socketsRef.current = [];
-
-            return { success: true, result };
-          } else {
-            console.log(
-              `❌ Thread-${index + 1} failed at ${performance.now().toFixed(3)} ms`
-            );
-            toast.error("❌ Failed to place Sell order.");
-            return { success: false };
-          }
-        })
-        .catch((err) => {
-          console.error(
-            `🔥 Thread-${index + 1} error at ${performance.now().toFixed(3)} ms:`,
-            err
+  const requests = prepared.map(({ request, index }) =>
+    fetch(request)
+      .then(async (response) => {
+        const result = await response.json();
+        if (response.ok) {
+          console.log(
+            `✅ Thread-${index + 1} resolved at ${performance.now().toFixed(3)} ms | Order ID: ${result.order_id}`
           );
+          toast.success(result?.message);
+          setSellOrderPrice(result?.price);
+
+          // Close sockets once on first success
+          socketsRef.current.forEach((ws) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.close();
+            }
+          });
+          socketsRef.current = [];
+
+          return { success: true, result };
+        } else {
+          console.log(
+            `❌ Thread-${index + 1} failed at ${performance.now().toFixed(3)} ms`
+          );
+          toast.error("❌ Failed to place Sell order.");
           return { success: false };
-        })
-    );
+        }
+      })
+      .catch((err) => {
+        console.error(
+          `🔥 Thread-${index + 1} error at ${performance.now().toFixed(3)} ms:`,
+          err
+        );
+        return { success: false };
+      })
+  );
 
-    // Step 3: Wait for all
-    const results = await Promise.all(requests);
+  // Step 3: Wait for all
+  const results = await Promise.all(requests);
 
-    // You can inspect results here if needed
-    console.log("All sell requests completed:", results);
-  };
+  // You can inspect results here if needed
+  console.log("All sell requests completed:", results);
+};
 
   useEffect(() => {
     if (instrumentKey) {
@@ -639,7 +642,7 @@ const ManualTradeUI = () => {
   return (
     <div className="p-6 space-y-8">
       <div className="bg-white rounded-lg shadow-md p-6 w-full mx-auto">
-        <h2 className="text-lg font-semibold mb-4">Manual Trade Setup</h2>
+        <h2 className="text-lg font-semibold mb-4">Testing Manual Trade Setup</h2>
         {/* <div className=" gap-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Configure Trade</label>
           <div
@@ -727,12 +730,6 @@ const ManualTradeUI = () => {
               Buy
             </button>
             <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700" onClick={handleSell}>Sell</button>
-
-            <Link to={'/dry-manual-trade'}>
-              <button className="bg-white text-black border-2 border-black  px-4 py-2 rounded-lg transition-all ease-in hover:bg-black hover:text-white">
-                Go to Testing Mode
-              </button>
-            </Link>
           </div>
         </div>
       </div>
@@ -747,7 +744,7 @@ const ManualTradeUI = () => {
   );
 };
 
-export default ManualTradeUI;
+export default DryManualTradeUI;
 
 
 

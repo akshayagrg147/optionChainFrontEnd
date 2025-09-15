@@ -12,6 +12,7 @@ import { ToastContainer } from "react-toastify";
 import PrivateRoute from "./components/PrivateRoute";
 import { ManualWebSocketProvider } from "./ManualWebSocketContext";
 import UpstoxAuth from "./components/UpstoxAuth";
+import DryManualTradeUI from "./components/DryRunManualTrade";
 
 
 function App() {
@@ -48,6 +49,17 @@ function App() {
 
               <ManualWebSocketProvider>
                 <ManualTradeUI />
+              </ManualWebSocketProvider>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/dry-manual-trade"
+          element={
+            <PrivateRoute>
+
+              <ManualWebSocketProvider>
+                <DryManualTradeUI />
               </ManualWebSocketProvider>
             </PrivateRoute>
           }
