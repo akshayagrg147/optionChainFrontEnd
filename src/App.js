@@ -11,6 +11,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from "react-toastify";
 import PrivateRoute from "./components/PrivateRoute";
 import { ManualWebSocketProvider } from "./ManualWebSocketContext";
+import UpstoxAuth from "./components/UpstoxAuth";
 
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/auth" element={<UpstoxAuth />} />
 
         {/* Protected Routes */}
         <Route

@@ -151,7 +151,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 
 const WebSocketContext = createContext();
 
-export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade }) => {
+export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -225,7 +225,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
         }
 
         // ✅ Handle success scenario
-        if (data.message === "Order placed successfully...Waiting for square off" ) {
+        if (data.message === "Order placed successfully...Waiting for square off") {
           setTradeData((prev) =>
             prev.map((item) =>
               item.status === "Vigilant"
@@ -250,7 +250,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
         //     }))
         //   );
         // }
-        if (data?.locked_LTP ) {
+        if (data?.locked_LTP) {
           setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
@@ -258,7 +258,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
             }))
           );
         }
-        if (data.message === "Token sell" ) {
+        if (data.message === "Token sell") {
 
           setTradeData((prev) =>
             prev.map((item) => ({
@@ -267,7 +267,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
             }))
           );
         }
-        if (data.message === " Reverse token ...Order placed successfully...Waiting for square off" ) {
+        if (data.message === " Reverse token ...Order placed successfully...Waiting for square off") {
           //  setReverseTrade(true);
           console.log(data?.market_value, "data?.market_value");
           setRtpValue(data?.market_value)
@@ -304,6 +304,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
 
     const tokenData = JSON.parse(localStorage.getItem("funds")) || [];
     const activeTrades = tradeData.filter((trade) => trade.active);
+    console.log(tradeData, "tradeData");
 
     // Prevent duplicate sending by comparing last sent trades
     const newTradesToSend = activeTrades.filter(
@@ -338,25 +339,28 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     // });
     tokenData.forEach((user) => {
       newTradesToSend.forEach((trade) => {
+        console.log(newTradesToSend, "newTradesToSend");
+
         const message = {
-          instrument_key: "NSE_INDEX|Nifty 50",
+          instrument_key: `NSE_INDEX|${trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument}`,
           expiry_date: trade.dateOfContract || "2025-07-24",
           access_token: user.token,
           trading_symbol: trade.trading_symbol ? trade.trading_symbol : "",
-          trading_symbol_2: trade.trading_symbol_2 ? trade.trading_symbol_2 : "NIFTY2572425000PE",
+          trading_symbol_2: trade.trading_symbol_2 ? trade.trading_symbol_2 : "",
           target_market_price_CE: trade.targetMarketCE ?? 0,
           target_market_price_PE: trade.targetMarketPE ?? 0,
-          step: 0.25,
+          step: rtpValue ?? 0.25,
           profit_percent: 0.5,
-          quantity: 75,
-          total_amount: 10000,
-          investable_amount: 10000,
-          lot: 10,
+          quantity: user?.call_quantity + user?.put_quantity,
+          total_amount: user?.funds,
+          investable_amount: user?.investable_amount,
+          lot: user.call_lot,
           reverseTrade: reverseTrade ? 'ON' : 'OFF'
         };
+        console.log(message, "message");
 
         try {
-          console.log("📤 Sending WebSocket message:", message);
+          // console.log("📤 Sending WebSocket message:", message);
           socketRef.current.send(JSON.stringify(message));
           sentMessageMapRef.current.push({ token: user.token, id: user.id });
         } catch (err) {
@@ -400,8 +404,6 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     }, 10); // debounce delay
   }, [tradeData, isSocketReady]);
   const updateFundsStatus = (id, newStatus) => {
-    console.log(id, "id");
-
     const funds = JSON.parse(localStorage.getItem("funds")) || [];
     const updatedFunds = funds.map((fund) =>
       fund.id === id ? { ...fund, status: newStatus } : fund

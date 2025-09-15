@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NotificationPanel from "../../Common/Notification";
 import { FaBell } from "react-icons/fa";
+import axios from "axios";
 
 const Topbar = () => {
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [active, setActive] = useState("live");
   const notificationRef = useRef(null);
   const handleNotificationClick = () => {
     setNotificationOpen(!notificationOpen); // Only open on click
@@ -29,7 +31,32 @@ const Topbar = () => {
   }, []);
 
   const handleEmergencyClick = () => {
-    alert("Emergency Square-Off triggered!");
+    const funds = JSON.parse(localStorage.getItem('funds')) || [];
+
+    const url = 'https://api.upstox.com/v2/order/positions/exit';
+
+    const requests = funds.map((item) => {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${item.token}`,
+      };
+
+      const data = {};
+
+      return axios.post(url, data, { headers });
+    });
+
+    // 🟢 Fire all at once in parallel
+    Promise.all(requests)
+      .then((responses) => {
+        responses.forEach((res, i) => {
+          console.log(`Response ${i + 1}:`, res.data);
+        });
+      })
+      .catch((error) => {
+        console.error('Error during emergency exit:', error.message);
+      });
   };
   const handleLogout = () => {
     localStorage.removeItem('access-token');
@@ -42,10 +69,23 @@ const Topbar = () => {
     <div className="bg-white px-6 py-3 shadow-sm border-b border-gray-200 flex justify-between items-center">
       {/* Left Side Buttons */}
       <div className="flex gap-4">
-        <button className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm">
+        <button
+          onClick={() => setActive("live")}
+          className={`px-4 py-1 text-sm rounded-full font-medium ${active === "live"
+            ? "bg-green-600 text-white"
+            : "bg-white text-gray-700 hover:bg-green-50"
+            }`}
+        >
           Live Trading
         </button>
-        <button className="bg-yellow-500 text-white px-4 py-1 rounded hover:bg-yellow-600 text-sm">
+
+        <button
+          onClick={() => setActive("simulation")}
+          className={`px-4 py-1 text-sm rounded-full font-medium ${active === "simulation"
+            ? "bg-yellow-500 text-white"
+            : "bg-white text-gray-700 hover:bg-yellow-50"
+            }`}
+        >
           Simulation
         </button>
         <Link to={'/square-off'}>
@@ -67,7 +107,7 @@ const Topbar = () => {
       <div className="flex items-center gap-3">
 
         <button
-          // onClick={handleEmergencyClick}
+          onClick={handleEmergencyClick}
           className="bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
         >
           🚨 Emergency Square-Off

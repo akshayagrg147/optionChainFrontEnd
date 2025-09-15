@@ -7,52 +7,26 @@ import axios from "axios";
 
 const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade }) => {
 
-  console.log(rtpValue, "data");
+ useEffect(() => {
+  if (data.length === 0) return;
 
+  // Only run when all editMode are false
+  const anyEditing = data.some(d => d.editMode);
+  if (anyEditing) return;
 
-  // const [data, setData] = useState([
-  //   {
-  //     type: 'CALL',
-  //     instrument: 'Nifty 50',
-  //     strikePrice: 22500,
-  //     dateOfContract: '2025-07-10',
-  //     targetMarket: 23000,
-  //     currentMarket: 22650,
-  //     lotSize: 50,
-  //     ltpLocked: 'No',
-  //     status: 'Inactive',
-  //     pl: '3.25%',
-  //     buyInLTP: 102.5,
-  //     liveInLTP: 26.5,
-  //     active: false,
-  //     editMode: false,
-  //   },
-  //   {
-  //     type: 'PUT',
-  //     instrument: 'Bank Nifty',
-  //     strikePrice: 49000,
-  //     dateOfContract: '2025-07-10',
-  //     targetMarket: 48000,
-  //     currentMarket: 49200,
-  //     lotSize: 25,
-  //     ltpLocked: 'Yes',
-  //     status: 'Inactive',
-  //     pl: '-2.15%',
-  //     buyInLTP: 185.7,
-  //     liveInLTP: 10.7,
-  //     active: false,
-  //     editMode: false,
-  //   },
-  // ]);
-  useEffect(() => {
-    if (data?.length > 0) {
-      handleGetToken();
-    }
-  }, []);
-
-
+  handleGetToken();
+}, [
+  JSON.stringify(
+    data.map(d => ({
+      instrument: d.instrument,
+      strikePrice: d.strikePrice,
+      dateOfContract: d.dateOfContract,
+      type: d.type,
+      editMode: d.editMode    // <-- Added
+    }))
+  )
+]);
   const { ceData, peData } = useWebSocket();
-
   useEffect(() => {
     if (!ceData && !peData) return;
 
@@ -71,214 +45,152 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
     );
   }, [ceData, peData]);
 
-  const handleGetToken = async () => {
-    const payload = {
-      options: data.map((f) => ({
-        name: f.instrument === 'Nifty Bank' ? 'BANKNIFTY' : f.instrument,
-        expiry: f.dateOfContract,
-        option_type: f.type === 'CALL' ? 'CE' : 'PE',
-        strike: parseFloat(f.strikePrice),
-      })),
-    };
+const handleGetToken = async () => {
+  const payload = {
+    options: data.map((f) => ({
+      name: f.instrument === 'Nifty Bank' ? 'BANKNIFTY' : f.instrument,
+      expiry: f.dateOfContract,
+      option_type: f.type === 'CALL' ? 'CE' : 'PE',
+      strike: parseFloat(f.strikePrice),
+    })),
+  };
 
-    try {
-      const response = await fetch(`${process.env.REACT_APP_BASE_URL}ManualTrade/gettoken/`, {
+  try {
+    const response = await fetch(
+      `${process.env.REACT_APP_BASE_URL}ManualTrade/gettoken/`,
+      {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+      }
+    );
+
+    const result = await response.json();
+
+    if (response.ok) {
+      console.log(result, 'result');
+
+      const tempData = data.map((item) => {
+        const matched = result.results.find(
+          (res) =>
+            res.name === item.instrument &&
+            res.expiry === item.dateOfContract &&
+            res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+            res.strike === parseFloat(item.strikePrice)
+        );
+
+        if (matched) {
+          // Pass type explicitly: CALL or PUT
+          countLtp(matched.instrument_key, item.type);
+
+          const isCE = matched.tradingsymbol.endsWith('CE');
+          const isPE = matched.tradingsymbol.endsWith('PE');
+          console.log(matched,"isCE");
+          
+          return {
+            ...item,  
+            instrument_key: matched.instrument_key,
+            ...(isCE ? { trading_symbol: matched.tradingsymbol } : {}),
+            ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
+          };
+        }
+
+        return item;
       });
 
-      const result = await response.json();
+      setData(tempData);
+    } else {
+      alert('❌ Failed to track.');
+    }
+  } catch (error) {
+    console.error('API error:', error);
+    alert('❌ Error occurred during tracking.');
+  }
+};
 
-      if (response.ok) {
-        // Map response back to original data and update state
-        // const updatedData = data.map((item) => {
-        //   const matched = result.results.find(
-        //     (res) =>
-        //       res.name === item.instrument &&
-        //       res.expiry === item.dateOfContract &&
-        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
-        //       res.strike === parseFloat(item.strikePrice)
-        //   );
+// ✅ countLtp now accepts type
+const countLtp = async (instrument_key, type) => {
+  const fundsData = JSON.parse(localStorage.getItem('funds'));
+  console.log(fundsData, 'fundsData');
 
-        //   return matched
-        //     ? {
-        //         ...item,
-        //         instrument_key: matched.instrument_key,
-        //         trading_symbol: matched.tradingsymbol,
-        //       }
-        //     : item;
-        // });
-        console.log(result, "result");
+  const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
+  const headers = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${fundsData[0]?.token}`,
+  };
 
-        // const updatedData = data.map((item) => {
-        //   const matched = result.results.find(
-        //     (res) =>
-        //       res.name === item.instrument &&
-        //       res.expiry === item.dateOfContract &&
-        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
-        //       res.strike === parseFloat(item.strikePrice)
-        //   );
+  if (instrument_key) {
+    try {
+      const response = await axios.get(url, { headers });
+      const data = response.data?.data;
 
-        //   if (matched) {
-        //     // Call countLtp here with matched instrument_key
-        //     countLtp(matched.instrument_key);
+      if (data) {
+        const firstKey = Object.keys(data)[0];
+        const lastPrice = data[firstKey]?.last_price;
 
-        //     return {
-        //       ...item,
-        //       instrument_key: matched.instrument_key,
-        //       trading_symbol: matched.tradingsymbol,
-        //     };
-        //   }
-
-        //   return item;
-        // });
-        // const updatedData = data.map((item) => {
-        //   const matched = result.results.find(
-        //     (res) =>
-        //       res.name === item.instrument &&
-        //       res.expiry === item.dateOfContract &&
-        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
-        //       res.strike === parseFloat(item.strikePrice)
-        //   );
-
-        //   if (matched) {
-        //     // Call countLtp here with matched instrument_key
-        //     countLtp(matched.instrument_key);
-
-        //     const isCE = matched.tradingsymbol.endsWith("CE");
-        //     const isPE = matched.tradingsymbol.endsWith("PE");
-
-        //     return {
-        //       ...item,
-        //       instrument_key: matched.instrument_key,
-        //       ...(isCE ? { trading_symbol: matched.tradingsymbol } : {}),
-        //       ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
-        //     };
-        //   }
-
-        //   return item;
-        // });
-        // console.log(updatedData,"updatedData");
-
-        // setData(updatedData);
-        let tempData = data.map((item) => {
-          const matched = result.results.find(
-            (res) =>
-              res.name === item.instrument &&
-              res.expiry === item.dateOfContract &&
-              res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
-              res.strike === parseFloat(item.strikePrice)
-          );
-
-          if (matched) {
-            countLtp(matched.instrument_key);
-
-            const isCE = matched.tradingsymbol.endsWith("CE");
-            const isPE = matched.tradingsymbol.endsWith("PE");
-
-            console.log(matched,"updatedData");
-            return {
-              ...item,
-              instrument_key: matched.instrument_key,
-              ...(isCE ? { trading_symbol: matched.tradingsymbol } : {}),
-              ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
-            };
-          }
-
-          return item;
-        });
-        console.log(tempData,"tempData");
-        
-        // Step 2: Ensure both CE and PE symbols exist on all items
-        const ceSymbol = tempData.find(item => item.trading_symbol)?.trading_symbol || "";
-        const peSymbol = tempData.find(item => item.trading_symbol_2)?.trading_symbol_2 || "";
-
-        const updatedData = tempData.map(item => ({
-          ...item,
-          trading_symbol: ceSymbol,
-          trading_symbol_2: peSymbol
-        }));
-        
-        setData(updatedData);
+        if (lastPrice) {
+          calculateAndStoreQuantities(lastPrice, type);
+        }
       } else {
-        alert('❌ Failed to track.');
+        console.error('No data returned');
       }
     } catch (error) {
-      console.error('API error:', error);
-      alert('❌ Error occurred during tracking.');
+      console.error(
+        'Error fetching LTP:',
+        error.response?.data || error.message
+      );
     }
-  };
-  const countLtp = async (instrument_key) => {
-    const fundsData = JSON.parse(localStorage.getItem('funds'));
-    console.log(fundsData, "fundsData");
-
-    const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
-    const headers = {
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${fundsData[0]?.token}`
-    };
-
-    if (instrument_key) {
-      try {
-        const response = await axios.get(url, { headers });
-        const data = response.data?.data;
-
-        if (data) {
-          // Extract the first key dynamically
-          const firstKey = Object.keys(data)[0];
-          const lastPrice = data[firstKey]?.last_price;
-          calculateAndStoreQuantities(lastPrice)
-
-        } else {
-          console.error('No data returned');
-        }
-      } catch (error) {
-        console.error('Error fetching LTP:', error.response?.data || error.message);
-      }
-    }
-  };
-
-  function calculateAndStoreQuantities(ltp) {
-    if (!ltp || ltp <= 0) {
-      console.error("Invalid LTP");
-      return;
-    }
-
-    const fundsRaw = localStorage.getItem("funds");
-    if (!fundsRaw) {
-      console.error("No funds found in localStorage");
-      return;
-    }
-
-    const funds = JSON.parse(fundsRaw);
-
-    const updatedFunds = funds.map((fund, index) => {
-      const investableAmount = parseInt(fund.funds);
-      const lotSize = parseInt(fund.call_lot) + parseInt(fund.put_lot)
-      // const lotSize = parseInt(fund.lotSize);
-
-      if (!investableAmount || !lotSize) {
-        console.error(`Invalid fund at index ${index}`);
-        return { ...fund, call_quantity: 0, put_quantity: 0 };
-      }
-
-      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
-      const quantity = numberOfLots * lotSize;
-
-      return {
-        ...fund,
-        call_quantity: quantity,
-        put_quantity: quantity
-      };
-    });
-
-    // Save updated funds back to localStorage
-    localStorage.setItem("funds", JSON.stringify(updatedFunds));
-    console.log("Updated funds with manualTradeQuantity saved to localStorage.");
   }
+};
+
+// ✅ Separate call and put calculation
+function calculateAndStoreQuantities(ltp, type) {
+  console.log(type,"type");
+  
+  if (!ltp || ltp <= 0) {
+    console.error('Invalid LTP');
+    return;
+  }
+
+  const fundsRaw = localStorage.getItem('funds');
+  if (!fundsRaw) {
+    console.error('No funds found in localStorage');
+    return;
+  }
+
+  const funds = JSON.parse(fundsRaw);
+
+  const updatedFunds = funds.map((fund, index) => {
+    const investableAmount = parseInt(fund.investable_amount);
+    const lotSize = parseInt(data[index]?.lotSize); // use correct lotSize per instrument
+    console.log(lotSize,"lotSize");
+    
+    if (!investableAmount || !lotSize) {
+      console.error(`Invalid fund at index ${index}`);
+      return { ...fund };
+    }
+    console.log(investableAmount/(ltp * lotSize),"investableAmount");
+    
+    const numberOfLots = investableAmount / (ltp * lotSize);
+    const quantity = numberOfLots * lotSize;
+
+    console.log(
+      `${type} => LTP: ${ltp}, Lots: ${numberOfLots}, Qty: ${quantity}`
+    );
+
+    if (type === 'CALL') {
+      return { ...fund, call_quantity: quantity,call_lot:lotSize };
+    } else if (type === 'PUT') {
+      return { ...fund, put_quantity: quantity,put_lot:lotSize };
+    } else {
+      return { ...fund };
+    }
+  });
+
+  localStorage.setItem('funds', JSON.stringify(updatedFunds));
+  console.log('Updated funds saved with LTP calculation.');
+}
+
   return (
     <>
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
