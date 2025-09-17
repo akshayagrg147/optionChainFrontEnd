@@ -681,6 +681,10 @@ const handleBuy = async () => {
               <option value="Nifty Bank">Bank Nifty</option>
               <option value="NIFTY">Nifty</option>
               <option value="FINNIFTY">Fin Nifty</option>
+              <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+              <option value="SENSEX">SENSEX</option>
+              <option value="BANKEX">BANKEX</option>
+              <option value="SX50">SX50</option>
             </select>
           </div>
 

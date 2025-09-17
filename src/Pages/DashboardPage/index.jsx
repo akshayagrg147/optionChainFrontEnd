@@ -52,6 +52,7 @@ const initialRows = [
 const DashboardPage = () => {
     const [reverseTrade, setReverseTrade] = useState(false);
     const [rtpValue, setRtpValue] = useState(0);
+    const [spreadSize, setSpreadSize] = useState(0.5);
 
     const [data, setData] = useState(initialRows);
     const [reverseData, setReverseData] = useState(initialRows.map((r) => ({ ...r }))); // 🔁 clone for reverse trade
@@ -70,6 +71,7 @@ const DashboardPage = () => {
                             setReverseTrade={setReverseTrade}
                             setRtpValue={setRtpValue}
                             rtpValue={rtpValue}
+                            spreadSize={spreadSize}
                         >
 
                             <TradeTable
@@ -79,9 +81,11 @@ const DashboardPage = () => {
                                 reverseTrade={reverseTrade}
                                 rtpValue={rtpValue}
                                 setRtpValue={setRtpValue}
+                                spreadSize={spreadSize}
+                                setSpreadSize={setSpreadSize}
                             />
                             {reverseTrade &&
-                                <TradeTableSecond  data={reverseData} setData={setReverseData} />}
+                                <TradeTableSecond data={reverseData} setData={setReverseData} />}
 
 
                             <MarketTable

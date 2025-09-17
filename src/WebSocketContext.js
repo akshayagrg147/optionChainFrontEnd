@@ -151,7 +151,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 
 const WebSocketContext = createContext();
 
-export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue }) => {
+export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue,spreadSize }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -349,8 +349,8 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
           trading_symbol_2: trade.trading_symbol_2 ? trade.trading_symbol_2 : "",
           target_market_price_CE: trade.targetMarketCE ?? 0,
           target_market_price_PE: trade.targetMarketPE ?? 0,
-          step: rtpValue ?? 0.25,
-          profit_percent: 0.5,
+          step: spreadSize ?? 0.25,
+          profit_percent:rtpValue ?? 0.5,
           quantity: user?.call_quantity + user?.put_quantity,
           total_amount: user?.funds,
           investable_amount: user?.investable_amount,

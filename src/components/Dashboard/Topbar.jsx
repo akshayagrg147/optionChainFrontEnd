@@ -88,19 +88,19 @@ const Topbar = () => {
         >
           Simulation
         </button>
-        <Link to={'/square-off'}>
+        {/* <Link to={'/square-off'}>
           <button className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 text-sm">
             Square off settings
           </button>
-        </Link>
+        </Link> */}
         <Link to={'/manual-trade'}>
           <button className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 text-sm">
             Manual Trade Setup
           </button>
         </Link>
-        <button className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm">
+        {/* <button className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm">
           Settings
-        </button>
+        </button> */}
       </div>
 
       {/* Right Side Buttons */}
