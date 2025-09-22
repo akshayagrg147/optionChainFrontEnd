@@ -296,84 +296,165 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     };
   };
 
-  const sendActiveTradeMessages = () => {
-    if (!isSocketReady || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-      console.warn("⏳ WebSocket not ready to send data.");
-      return;
-    }
+  // const sendActiveTradeMessages = () => {
+  //   if (!isSocketReady || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+  //     console.warn("⏳ WebSocket not ready to send data.");
+  //     return;
+  //   }
 
-    const tokenData = JSON.parse(localStorage.getItem("funds")) || [];
-    const activeTrades = tradeData.filter((trade) => trade.active);
-    console.log(tradeData, "tradeData");
+  //   const tokenData = JSON.parse(localStorage.getItem("funds")) || [];
+  //   const activeTrades = tradeData.filter((trade) => trade.active);
+  //   console.log(activeTrades, "tradeData");
 
-    // Prevent duplicate sending by comparing last sent trades
-    const newTradesToSend = activeTrades.filter(
-      (trade) =>
-        !lastSentTradesRef.current.some(
-          (t) => t.tradingSymbolCE === trade.tradingSymbolCE && t.tradingSymbolPE === trade.tradingSymbolPE
-        )
-    );
+  //   // Prevent duplicate sending by comparing last sent trades
+  //   const newTradesToSend = tradeData.filter(
+  //     (trade) =>
+  //       !lastSentTradesRef.current.some(
+  //         (t) => t.tradingSymbolCE === trade.tradingSymbolCE && t.tradingSymbolPE === trade.tradingSymbolPE
+  //       )
+  //   );
+  //   console.log(newTradesToSend, "newTradesToSend2");
+    
+  //   if (newTradesToSend.length === 0) return;
 
-    if (newTradesToSend.length === 0) return;
+  //   // Update last sent
+  //   lastSentTradesRef.current = activeTrades;
 
-    // Update last sent
-    lastSentTradesRef.current = activeTrades;
+  //   // tokenData.forEach((user) => {
+  //   //   newTradesToSend.forEach((trade) => {
+  //   //     const message = {
+  //   //       instrument_key: trade.instrument || "NSE_INDEX|Nifty 50",
+  //   //       expiry_date: trade.dateOfContract || "2025-07-24",
+  //   //       access_token: user.token,
+  //   //       trading_symbol: trade.tradingSymbolCE || "NIFTY2572425000CE",
+  //   //       trading_symbol_2: trade.tradingSymbolPE || "NIFTY2572425000PE",
+  //   //       target_market_price_CE: trade.targetMarketCE ?? 0,
+  //   //       target_market_price_PE: trade.targetMarketPE ?? 0,
+  //   //       step: 0.25,
+  //   //       profit_percent: 0.5,
+  //   //     };
 
-    // tokenData.forEach((user) => {
-    //   newTradesToSend.forEach((trade) => {
-    //     const message = {
-    //       instrument_key: trade.instrument || "NSE_INDEX|Nifty 50",
-    //       expiry_date: trade.dateOfContract || "2025-07-24",
-    //       access_token: user.token,
-    //       trading_symbol: trade.tradingSymbolCE || "NIFTY2572425000CE",
-    //       trading_symbol_2: trade.tradingSymbolPE || "NIFTY2572425000PE",
-    //       target_market_price_CE: trade.targetMarketCE ?? 0,
-    //       target_market_price_PE: trade.targetMarketPE ?? 0,
-    //       step: 0.25,
-    //       profit_percent: 0.5,
-    //     };
+  //   //     console.log("📤 Sending WebSocket message:", message);
+  //   //     socketRef.current.send(JSON.stringify(message));
+  //   //   });
+  //   // });
+  //   tokenData.forEach((user) => {
+  //     tradeData.forEach((trade) => {
+  //       console.log(newTradesToSend, "newTradesToSend");
 
-    //     console.log("📤 Sending WebSocket message:", message);
-    //     socketRef.current.send(JSON.stringify(message));
-    //   });
-    // });
-    tokenData.forEach((user) => {
-      newTradesToSend.forEach((trade) => {
-        console.log(newTradesToSend, "newTradesToSend");
+  //       const message = {
+  //         instrument_key: `NSE_INDEX|${trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument}`,
+  //         expiry_date: trade.dateOfContract || "2025-07-24",
+  //         access_token: user.token,
+  //         trading_symbol: trade.trading_symbol ? trade.trading_symbol : "",
+  //         trading_symbol_2: trade.trading_symbol_2 ? trade.trading_symbol_2 : "",
+  //         target_market_price_CE: trade.targetMarketCE ?? 0,
+  //         target_market_price_PE: trade.targetMarketPE ?? 0,
+  //         step: spreadSize ?? 0.25,
+  //         profit_percent:rtpValue ?? 0.5,
+  //         quantity: user?.call_quantity + user?.put_quantity,
+  //         total_amount: user?.funds,
+  //         investable_amount: user?.investable_amount,
+  //         lot: user.call_lot,
+  //         reverseTrade: reverseTrade ? 'ON' : 'OFF'
+  //       };
+  //       console.log(message, "message");
 
-        const message = {
-          instrument_key: `NSE_INDEX|${trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument}`,
-          expiry_date: trade.dateOfContract || "2025-07-24",
-          access_token: user.token,
-          trading_symbol: trade.trading_symbol ? trade.trading_symbol : "",
-          trading_symbol_2: trade.trading_symbol_2 ? trade.trading_symbol_2 : "",
-          target_market_price_CE: trade.targetMarketCE ?? 0,
-          target_market_price_PE: trade.targetMarketPE ?? 0,
-          step: spreadSize ?? 0.25,
-          profit_percent:rtpValue ?? 0.5,
-          quantity: user?.call_quantity + user?.put_quantity,
-          total_amount: user?.funds,
-          investable_amount: user?.investable_amount,
-          lot: user.call_lot,
-          reverseTrade: reverseTrade ? 'ON' : 'OFF'
-        };
-        console.log(message, "message");
+  //       try {
+  //         console.log("📤 Sending WebSocket message:", message);
+  //         // socketRef.current.send(JSON.stringify(message));
+  //         sentMessageMapRef.current.push({ token: user.token, id: user.id });
+  //       } catch (err) {
+  //         console.log(err, 'asd');
 
-        try {
-          // console.log("📤 Sending WebSocket message:", message);
-          socketRef.current.send(JSON.stringify(message));
-          sentMessageMapRef.current.push({ token: user.token, id: user.id });
-        } catch (err) {
-          console.log(err, 'asd');
-
-          // console.error("❌ Failed to send WebSocket message for token:", user.id, err);
-          updateFundsStatus(user.id, "Failed"); // Update status in localStorage
-        }
-      });
-    });
-  };
+  //         // console.error("❌ Failed to send WebSocket message for token:", user.id, err);
+  //         updateFundsStatus(user.id, "Failed"); // Update status in localStorage
+  //       }
+  //     });
+  //   });
+  // };
 
   // Connect once on mount
+  
+const sendActiveTradeMessages = () => {
+  if (!isSocketReady || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+    console.warn("⏳ WebSocket not ready to send data.");
+    return;
+  }
+
+  const tokenData = JSON.parse(localStorage.getItem("funds")) || [];
+  const activeTrades = tradeData.filter((trade) => trade.active);
+  console.log(activeTrades, "activeTrades");
+
+  // Prevent duplicate sending
+  const newTradesToSend = activeTrades.filter(
+    (trade) =>
+      !lastSentTradesRef.current.some(
+        (t) =>
+          t.trading_symbol === trade.trading_symbol &&
+          t.trading_symbol_2 === trade.trading_symbol_2
+      )
+  );
+
+  if (newTradesToSend.length === 0) return;
+
+  // Save last sent
+  lastSentTradesRef.current = activeTrades;
+
+  tokenData.forEach((user) => {
+    newTradesToSend.forEach((trade) => {
+      let ceToken = trade.trading_symbol || "";
+      let peToken = trade.trading_symbol_2 || "";
+
+      // ✅ Special case:
+      // If this trade is CALL but has no trading_symbol_2,
+      // look in the full tradeData for a matching PUT leg
+      if (trade.type === "CALL" && !trade.trading_symbol_2) {
+        const matchingPut = tradeData.find(
+          (t) =>
+            t.instrument === trade.instrument &&
+            t.dateOfContract === trade.dateOfContract &&
+            t.type === "PUT"
+        );
+        if (matchingPut) {
+          peToken = matchingPut.trading_symbol_2 || matchingPut.trading_symbol || "";
+        }
+      }
+
+      const message = {
+        instrument_key: `NSE_INDEX|${
+          trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument
+        }`,
+        expiry_date: trade.dateOfContract || "2025-07-24",
+        access_token: user.token,
+        trading_symbol: ceToken,
+        trading_symbol_2: peToken,
+        target_market_price_CE: trade.targetMarketCE ?? 0,
+        target_market_price_PE: trade.targetMarketPE ?? 0,
+        step: spreadSize ?? 0.25,
+        profit_percent: rtpValue ?? 0.5,
+        quantity: user?.call_quantity + user?.put_quantity,
+        total_amount: user?.funds,
+        investable_amount: user?.investable_amount,
+        lot: user.call_lot,
+        reverseTrade: reverseTrade ? "ON" : "OFF",
+      };
+
+      console.log("📤 Sending WebSocket message:", message);
+
+      try {
+        socketRef.current.send(JSON.stringify(message));
+        sentMessageMapRef.current.push({ token: user.token, id: user.id });
+      } catch (err) {
+        console.error("❌ Failed to send WebSocket message:", err);
+        updateFundsStatus(user.id, "Failed");
+      }
+    });
+  });
+};
+
+
+
   useEffect(() => {
     connectWebSocket();
     return () => {

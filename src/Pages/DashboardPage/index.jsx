@@ -26,6 +26,7 @@ const initialRows = [
         active: false,
         editMode: false,
         trading_symbol: "NIFTY2571725200CE",
+        
     },
     {
         type: "PUT",
@@ -51,7 +52,7 @@ const initialRows = [
 
 const DashboardPage = () => {
     const [reverseTrade, setReverseTrade] = useState(false);
-    const [rtpValue, setRtpValue] = useState(0);
+    const [rtpValue, setRtpValue] = useState(0.25);
     const [spreadSize, setSpreadSize] = useState(0.5);
 
     const [data, setData] = useState(initialRows);

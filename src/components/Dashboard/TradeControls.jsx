@@ -70,33 +70,63 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       if (response.ok) {
         console.log(result, 'result');
 
+        // const tempData = data.map((item) => {
+        //   const matched = result.results.find(
+        //     (res) =>
+        //       res.name === item.instrument &&
+        //       res.expiry === item.dateOfContract &&
+        //       res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+        //       res.strike === parseFloat(item.strikePrice)
+        //   );
+
+        //   if (matched) {
+        //     // Pass type explicitly: CALL or PUT
+        //     countLtp(matched.instrument_key, item.type);
+
+        //     const isCE = matched.tradingsymbol.endsWith('CE');
+        //     const isPE = matched.tradingsymbol.endsWith('PE');
+        //     console.log(matched, "isCE");
+
+        //     return {
+        //       ...item,
+        //       instrument_key: matched.instrument_key,
+        //       ...(isCE ? { trading_symbol: matched.tradingsymbol, trading_symbol_2: matched.tradingsymbol } : {}),
+        //       ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
+        //     };
+        //   }
+
+        //   return item;
+        // });
+
         const tempData = data.map((item) => {
           const matched = result.results.find(
             (res) =>
               res.name === item.instrument &&
               res.expiry === item.dateOfContract &&
-              res.option_type === (item.type === 'CALL' ? 'CE' : 'PE') &&
+              res.option_type === (item.type === "CALL" ? "CE" : "PE") &&
               res.strike === parseFloat(item.strikePrice)
           );
 
           if (matched) {
-            // Pass type explicitly: CALL or PUT
             countLtp(matched.instrument_key, item.type);
-
-            const isCE = matched.tradingsymbol.endsWith('CE');
-            const isPE = matched.tradingsymbol.endsWith('PE');
-            console.log(matched, "isCE");
 
             return {
               ...item,
               instrument_key: matched.instrument_key,
-              ...(isCE ? { trading_symbol: matched.tradingsymbol } : {}),
-              ...(isPE ? { trading_symbol_2: matched.tradingsymbol } : {}),
+              trading_symbol:
+                matched.tradingsymbol.endsWith("CE")
+                  ? matched.tradingsymbol
+                  : item.trading_symbol, // keep CE if already set
+              trading_symbol_2:
+                matched.tradingsymbol.endsWith("PE")
+                  ? matched.tradingsymbol
+                  : item.trading_symbol_2, // keep PE if already set
             };
           }
 
           return item;
         });
+        console.log(tempData, 'tempData');
 
         setData(tempData);
       } else {
