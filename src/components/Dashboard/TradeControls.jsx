@@ -126,7 +126,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
         const tempData = data.map((item) => {
           const matched = result.results.find(
             (res) =>
-              res.name === item.instrument &&
+              // res.name === item.instrument &&
               res.expiry === item.dateOfContract &&
               res.option_type === (item.type === "CALL" ? "CE" : "PE") &&
               res.strike === parseFloat(item.strikePrice)
