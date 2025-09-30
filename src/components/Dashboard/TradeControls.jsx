@@ -226,7 +226,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       }
       console.log(investableAmount / (ltp * lotSize), "investableAmount");
 
-      const numberOfLots = investableAmount / (ltp * lotSize);
+      const numberOfLots =  Math.floor(investableAmount / (ltp * lotSize));
       const quantity = numberOfLots * lotSize;
 
       console.log(
@@ -234,9 +234,9 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       );
 
       if (type === 'CALL') {
-        return { ...fund, call_quantity: quantity, call_lot: lotSize };
+        return { ...fund, call_quantity: Math.round(quantity), call_lot: lotSize };
       } else if (type === 'PUT') {
-        return { ...fund, put_quantity: quantity, put_lot: lotSize };
+        return { ...fund, put_quantity: Math.round(quantity), put_lot: lotSize };
       } else {
         return { ...fund };
       }
