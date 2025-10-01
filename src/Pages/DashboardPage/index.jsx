@@ -54,7 +54,7 @@ const DashboardPage = () => {
     const [reverseTrade, setReverseTrade] = useState(false);
     const [rtpValue, setRtpValue] = useState(0.25);
     const [spreadSize, setSpreadSize] = useState(0.5);
-
+    const [reverseTradeDataTransfer,setReverseTradeDataTransfer] = useState(false);
     const [data, setData] = useState(initialRows);
     const [reverseData, setReverseData] = useState(initialRows.map((r) => ({ ...r }))); // 🔁 clone for reverse trade
 
@@ -66,13 +66,16 @@ const DashboardPage = () => {
                 <div className="p-4 gap-4">
                     <div className="space-y-4">
                         <WebSocketProvider
-                            tradeData={reverseTrade ? reverseData : data} // 🔁 switch which array goes to socket
-                            setTradeData={reverseTrade ? setReverseData : setData}
+                            tradeData={data} // 🔁 switch which array goes to socket
+                            setTradeData={reverseTradeDataTransfer ?  setReverseData  : setData}
                             reverseTrade={reverseTrade}
                             setReverseTrade={setReverseTrade}
                             setRtpValue={setRtpValue}
                             rtpValue={rtpValue}
                             spreadSize={spreadSize}
+                            setReverseData={setReverseData}
+                            reverseTradeDataTransfer={reverseTradeDataTransfer}
+                            setReverseTradeDataTransfer={setReverseTradeDataTransfer}
                         >
 
                             <TradeTable

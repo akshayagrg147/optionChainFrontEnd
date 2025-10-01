@@ -141,7 +141,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
               trading_symbol:
                 matched.tradingsymbol.endsWith("CE")
                   ? matched.tradingsymbol
-                  : item.trading_symbol, // keep CE if already set
+                  : item?.trading_symbol, // keep CE if already set
               trading_symbol_2:
                 matched.tradingsymbol.endsWith("PE")
                   ? matched.tradingsymbol

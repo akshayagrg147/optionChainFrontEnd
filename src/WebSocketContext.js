@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 
 const WebSocketContext = createContext();
 
-export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue, spreadSize }) => {
+export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue, spreadSize, setReverseData, setReverseTradeDataTransfer }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -32,7 +32,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
       console.log("✅ WebSocket connected");
       setIsSocketReady(true);
     };
-
+    console.log(tradeData, "tradeDatatradeData");
     // socket.onmessage = (event) => {
     //   try {
     //     const data = JSON.parse(event.data);
@@ -202,8 +202,51 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
 
         if (data.message === " Reverse token ...Order placed successfully...Waiting for square off") {
           console.log(data?.market_value, "data?.market_value");
+          setReverseTradeDataTransfer(true)
           setRtpValue(data?.market_value)
+          setReverseData(prev =>
+            prev.map(item => ({
+              ...item,
+              status: "Waiting for Square-Off",
+              buyInLTP: data?.ltp ?? item.buyInLTP,
+              ltpLocked: data?.locked_LTP ?? item.ltpLocked,
+              pl: data?.pnl_percent ?? item.pl
+            }))
+          );
         }
+        console.log(reverseTrade, "reverseTrade");
+
+        // if (!reverseTrade) {
+          if (data.message === "SELL Order placed successfully") {
+            setReverseTradeDataTransfer(false)
+            setTradeData((prev) =>
+              prev.map((item) =>
+                item.status === "Waiting for Square-Off"
+                  ? {
+                    ...item,
+                    status: "Sell Orders",
+                    buyInLTP: data?.ltp,
+                    pl: data?.ltp && data?.ltp !== 0
+                      ? (100 * ((data?.ltp - data?.ltp) / data?.ltp))
+                      : 0
+                  }
+                  : item
+              )
+            );
+
+            // ✅ Close socket & stop reconnect
+            // if (socketRef.current) {
+            //   socketRef.current.close();
+            //   socketRef.current = null;
+            // }
+            // if (reconnectTimeout.current) {
+            //   clearTimeout(reconnectTimeout.current);
+            //   reconnectTimeout.current = null;
+            // }
+            // setIsSocketReady(false);
+          }
+        // }
+
 
         // ✅ Update CE / PE data ONLY if strike + type match in tradeData
         const matchedTrade = tradeDataRef.current.find(
@@ -330,6 +373,8 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
   // Connect once on mount
 
   const sendActiveTradeMessages = () => {
+    console.log(isSocketReady, WebSocket.OPEN, "asd");
+
     if (!isSocketReady || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
       console.warn("⏳ WebSocket not ready to send data.");
       return;
@@ -345,14 +390,19 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
         !lastSentTradesRef.current.some(
           (t) =>
             t.trading_symbol === trade.trading_symbol &&
-            t.trading_symbol_2 === trade.trading_symbol_2
+            t.trading_symbol_2 === trade.trading_symbol_2 &&
+            t.reverseTrade === reverseTrade
         )
     );
+    console.log(newTradesToSend, "newTradesToSend");
 
     if (newTradesToSend.length === 0) return;
 
     // Save last sent
-    lastSentTradesRef.current = activeTrades;
+    lastSentTradesRef.current = activeTrades.map(t => ({
+      ...t,
+      reverseTrade
+    }));
 
     tokenData.forEach((user) => {
       newTradesToSend.forEach((trade) => {
@@ -407,6 +457,69 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     });
   };
 
+  useEffect(() => {
+    // reset last sent when reverseTrade changes
+    lastSentTradesRef.current = [];
+  }, [reverseTrade]);
+
+  // const sendActiveTradeMessages = () => {
+  //   if (!isSocketReady || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+  //     console.warn("⏳ WebSocket not ready to send data.");
+  //     return;
+  //   }
+
+  //   const tokenData = JSON.parse(localStorage.getItem("funds")) || [];
+  //   const activeTrades = tradeData.filter((trade) => trade.active);
+
+  //   // ✅ Now reverseTrade is stored per trade in lastSentTradesRef
+  //   const newTradesToSend = activeTrades.filter(
+  //     (trade) =>
+  //       !lastSentTradesRef.current.some(
+  //         (t) =>
+  //           t.trading_symbol === trade.trading_symbol &&
+  //           t.trading_symbol_2 === trade.trading_symbol_2 &&
+  //           t.reverseTrade === reverseTrade
+  //       )
+  //   );
+
+  //   if (newTradesToSend.length === 0) return;
+
+  //   // ✅ Save with reverseTrade flag
+  //   lastSentTradesRef.current = activeTrades.map(t => ({ ...t, reverseTrade }));
+
+  //   tokenData.forEach((user) => {
+  //     newTradesToSend.forEach((trade) => {
+  //       const message = {
+  //         instrument_key: `NSE_INDEX|${trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument}`,
+  //         expiry_date: trade.dateOfContract || "2025-07-24",
+  //         access_token: user.token,
+  //         trading_symbol: trade.trading_symbol || "",
+  //         trading_symbol_2: trade.trading_symbol_2 || "",
+  //         target_market_price_CE: trade.targetMarketCE ?? 0,
+  //         target_market_price_PE: trade.targetMarketPE ?? 0,
+  //         step: spreadSize ?? 0.25,
+  //         profit_percent: rtpValue ?? 0.5,
+  //         total_amount: user?.funds,
+  //         quantityCE: user?.call_quantity,
+  //         quantityPE: user?.put_quantity,
+  //         investable_amount: user?.investable_amount,
+  //         lot: user.call_lot,
+  //         reverseTrade: reverseTrade ? "ON" : "OFF",
+  //       };
+
+  //       console.log("📤 Sending WebSocket message:", message);
+
+  //       try {
+  //         socketRef.current.send(JSON.stringify(message));
+  //         sentMessageMapRef.current.push({ token: user.token, id: user.id });
+  //       } catch (err) {
+  //         console.error("❌ Failed to send WebSocket message:", err);
+  //         updateFundsStatus(user.id, "Failed");
+  //       }
+  //     });
+  //   });
+  // };
+
 
 
   useEffect(() => {
@@ -437,7 +550,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     sendTimeout.current = setTimeout(() => {
       sendActiveTradeMessages();
     }, 10); // debounce delay
-  }, [tradeData, isSocketReady]);
+  }, [tradeData, isSocketReady, reverseTrade]);
   const updateFundsStatus = (id, newStatus) => {
     const funds = JSON.parse(localStorage.getItem("funds")) || [];
     const updatedFunds = funds.map((fund) =>
