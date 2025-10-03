@@ -200,7 +200,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
           );
         }
 
-        if (data.message === " Reverse token ...Order placed successfully...Waiting for square off") {
+        if (data.message === "Reverse Order placed successfully...Waiting for square off") {
           console.log(data?.market_value, "data?.market_value");
           setReverseTradeDataTransfer(true)
           setRtpValue(data?.market_value)
@@ -217,34 +217,42 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
         console.log(reverseTrade, "reverseTrade");
 
         // if (!reverseTrade) {
-          if (data.message === "SELL Order placed successfully") {
-            setReverseTradeDataTransfer(false)
-            setTradeData((prev) =>
-              prev.map((item) =>
-                item.status === "Waiting for Square-Off"
-                  ? {
-                    ...item,
-                    status: "Sell Orders",
-                    buyInLTP: data?.ltp,
-                    pl: data?.ltp && data?.ltp !== 0
-                      ? (100 * ((data?.ltp - data?.ltp) / data?.ltp))
-                      : 0
-                  }
-                  : item
-              )
-            );
-
-            // ✅ Close socket & stop reconnect
-            // if (socketRef.current) {
-            //   socketRef.current.close();
-            //   socketRef.current = null;
-            // }
-            // if (reconnectTimeout.current) {
-            //   clearTimeout(reconnectTimeout.current);
-            //   reconnectTimeout.current = null;
-            // }
-            // setIsSocketReady(false);
-          }
+        if (data.message === "SELL Order placed successfully") {
+          setReverseTradeDataTransfer(false)
+          setTradeData((prev) =>
+            prev.map((item) =>
+              item.status === "Waiting for Square-Off"
+                ? {
+                  ...item,
+                  status: "Sell Orders",
+                  buyInLTP: data?.ltp,
+                  pl: data?.ltp && data?.ltp !== 0
+                    ? (100 * ((data?.ltp - data?.ltp) / data?.ltp))
+                    : 0
+                }
+                : item
+            )
+          );
+          setReverseData(prev =>
+            prev.map(item => ({
+              ...item,
+              status: "Sell Orders",
+              buyInLTP: data?.ltp ?? item.buyInLTP,
+              ltpLocked: data?.locked_LTP ?? item.ltpLocked,
+              pl: data?.pnl_percent ?? item.pl
+            }))
+          );
+          // ✅ Close socket & stop reconnect
+          // if (socketRef.current) {
+          //   socketRef.current.close();
+          //   socketRef.current = null;
+          // }
+          // if (reconnectTimeout.current) {
+          //   clearTimeout(reconnectTimeout.current);
+          //   reconnectTimeout.current = null;
+          // }
+          // setIsSocketReady(false);
+        }
         // }
 
 
@@ -433,14 +441,14 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
           trading_symbol_2: peToken,
           target_market_price_CE: trade.targetMarketCE ?? 0,
           target_market_price_PE: trade.targetMarketPE ?? 0,
-          step: spreadSize ?? 0.25,
-          profit_percent: rtpValue ?? 0.5,
+          step: parseFloat(spreadSize) ?? parseFloat(0.25),
+          profit_percent: parseFloat(rtpValue) ?? parseFloat(0.5),
           // quantity: user?.call_quantity + user?.put_quantity,
           total_amount: user?.funds,
           quantityCE: user?.call_quantity,
           quantityPE: user?.put_quantity,
-          investable_amount: user?.investable_amount,
-          lot: user.call_lot,
+          investable_amount: parseInt(user?.investable_amount),
+          lot: parseInt(user.call_lot),
           reverseTrade: reverseTrade ? "ON" : "OFF",
         };
 

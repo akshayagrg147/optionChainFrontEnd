@@ -415,7 +415,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                   <td className="px-4 py-2">{row.pl}</td>
                   <td className="px-4 py-2">{row.buyInLTP}</td>
                   <td className="px-4 py-2 text-green-500">{row.liveInLTP}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2" >
                     <div
                       onClick={() => {
                         const updated = [...data];
