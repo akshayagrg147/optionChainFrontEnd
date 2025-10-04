@@ -278,10 +278,10 @@ const TradeTableSecond = ({ data, setData,setRtpValue }) => {
                 <th className="px-4 py-2">Current Market</th>
                 <th className="px-4 py-2">Target Market</th>
                 <th className="px-4 py-2">Lot Size</th>
-                <th className="px-4 py-2">LTP Locked</th>
+                {/* <th className="px-4 py-2">LTP Locked</th> */}
                 <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">P/L %</th>
-                <th className="px-4 py-2">Buy In LTP</th>
+                {/* <th className="px-4 py-2">P/L %</th> */}
+                {/* <th className="px-4 py-2">Buy In LTP</th> */}
                 <th className="px-4 py-2">Live LTP</th>
                 <th className="px-4 py-2">Active</th>
                 <th className="px-4 py-2 text-center">Action</th>
@@ -379,7 +379,7 @@ const TradeTableSecond = ({ data, setData,setRtpValue }) => {
                       row.lotSize
                     )}
                   </td>
-                  <td className="px-4 py-2">{row.ltpLocked}</td>
+                  {/* <td className="px-4 py-2">{row.ltpLocked}</td> */}
                   <td className="px-4 py-2">
                     {row.editMode ? (
                       <select
@@ -399,8 +399,8 @@ const TradeTableSecond = ({ data, setData,setRtpValue }) => {
                       row.status
                     )}
                   </td>
-                  <td className="px-4 py-2">{row.pl}</td>
-                  <td className="px-4 py-2">{row.buyInLTP}</td>
+                  {/* <td className="px-4 py-2">{row.pl}</td> */}
+                  {/* <td className="px-4 py-2">{row.buyInLTP}</td> */}
                   <td className="px-4 py-2 text-green-500">{row.liveInLTP}</td>
                   <td className="px-4 py-2">
                     <div

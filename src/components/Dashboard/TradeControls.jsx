@@ -27,30 +27,33 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   //   )
   // ]);
   useEffect(() => {
-  if (data.length === 0) return;
+    if (data.length === 0) return;
 
-  // 🚫 Stop if any row is being edited
-  const anyEditing = data.some(d => d.editMode);
-  if (anyEditing) return;
+    // 🚫 Stop if any row is being edited
+    const anyEditing = data.some(d => d.editMode);
+    if (anyEditing) return;
 
-  // 🚫 Stop if any row is active
-  const anyActive = data.some(d => d.active);
-  if (anyActive) return;
+    // 🚫 Stop if any row is active
+    const anyActive = data.some(d => d.active);
+    if (anyActive) return;
     console.log('Fetching tokens as no rows are being edited or active');
-  // ✅ Run only when no editMode and no active rows
-  handleGetToken();
-}, [
-  JSON.stringify(
-    data.map(d => ({
-      instrument: d.instrument,
-      strikePrice: d.strikePrice,
-      dateOfContract: d.dateOfContract,
-      type: d.type,
-      editMode: d.editMode,
-      // active: d.active,   // <-- added to trigger when active changes
-    }))
-  )
-]);
+    // ✅ Run only when no editMode and no active rows
+    const interval = setInterval(() => {
+      handleGetToken();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [
+    JSON.stringify(
+      data.map(d => ({
+        instrument: d.instrument,
+        strikePrice: d.strikePrice,
+        dateOfContract: d.dateOfContract,
+        type: d.type,
+        editMode: d.editMode,
+        // active: d.active,   // <-- added to trigger when active changes
+      }))
+    )
+  ]);
   const { ceData, peData } = useWebSocket();
   useEffect(() => {
     if (!ceData && !peData) return;
@@ -226,7 +229,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       }
       console.log(investableAmount / (ltp * lotSize), "investableAmount");
 
-      const numberOfLots =  Math.floor(investableAmount / (ltp * lotSize));
+      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize * 1.015));
       const quantity = numberOfLots * lotSize;
 
       console.log(
@@ -268,8 +271,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                 <th className="px-4 py-2">Active</th>
                 <th className="px-4 py-2 text-center">Action</th>
               </tr>
-            </thead>
-            <tbody className="text-gray-800">
+            </thead>   <tbody className="text-gray-800">
               {data.map((row, index) => (
                 <tr key={index} className="border-t">
                   <td className="px-4 py-2">{row.type}</td>
@@ -415,42 +417,96 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                   <td className="px-4 py-2">{row.pl}</td>
                   <td className="px-4 py-2">{row.buyInLTP}</td>
                   <td className="px-4 py-2 text-green-500">{row.liveInLTP}</td>
-                  <td className="px-4 py-2" >
-                    <div
-                      onClick={() => {
-                        const updated = [...data];
-                        updated[index].active = !updated[index].active;
-                        setData(updated);
-                      }}
-                      className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${row.active ? 'bg-blue-500' : 'bg-gray-300'}`}
-                    >
+                  {/* <td className="px-4 py-2" rowSpan={2}>
+                    {index == 0 && (
                       <div
-                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${row.active ? 'left-[1.50rem]' : 'left-1'}`}
-                      />
-                    </div>
+                        onClick={() => {
+                          const updated = [...data];
+                          updated[index].active = !updated[index].active;
+                          setData(updated);
+                        }}
+                        className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${row.active ? 'bg-blue-500' : 'bg-gray-300'}`}
+                      >
+                        <div
+                          className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${row.active ? 'left-[1.50rem]' : 'left-1'}`}
+                        />
+                      </div>)}
                   </td>
-                  <td className="px-4 py-2 flex gap-2 items-center">
-                    <button
-                      className={`text-blue-500 hover:text-blue-700 ${row.active ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      onClick={() => {
-                        if (row.active) return;
-                        const updated = [...data];
-                        updated[index].editMode = !updated[index].editMode;
-                        setData(updated);
-                      }}
-                      disabled={row.active}
-                    >
-                      <FaPencilAlt />
-                    </button>
-                    <Link to="/manual-trade">
-                      <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">
-                        Buy / Sell
+                  <td className="px-4 py-2 flex gap-2 items-center" rowSpan={2}>
+                    {index === 0 && (
+                      <button
+                        className={`text-blue-500 hover:text-blue-700 ${row.active ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={() => {
+                          if (row.active) return;
+
+                          // 🔄 Toggle editMode for ALL rows based on first one
+                          const allEdit = data[0].editMode;
+                          const updated = data.map(item => ({
+                            ...item,
+                            editMode: !allEdit,
+                          }));
+                          setData(updated);
+                        }}
+                        disabled={row.active}
+                      >
+                        <FaPencilAlt />
                       </button>
-                    </Link>
+                    )}
+                  </td> */}
+                  <td
+                    className="px-4 py-2 text-center align-middle "
+                    rowSpan={2}
+                  >
+                    {index === 0 && (
+                      <div
+                        onClick={() => {
+                          const allActive = data.some((d) => d.active);
+                          const updated = data.map((item) => ({
+                            ...item,
+                            active: !allActive,
+                          }));
+                          setData(updated);
+                        }}
+                        className={`w-12 h-6 mx-auto rounded-full relative cursor-pointer transition-colors duration-300 ${data.some((d) => d.active) ? "bg-blue-500" : "bg-gray-300"
+                          }`}
+                      >
+                        <div
+                          className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${data.some((d) => d.active) ? "left-[1.60rem]" : "left-1"
+                            }`}
+                        />
+                      </div>
+                    )}
                   </td>
+
+                  {index === 0 && (
+                    <td
+                      className="px-4 py-2 text-center align-middle gap-2 items-center "
+                      rowSpan={2}
+                    >
+                      <button
+                        className={`text-blue-500 hover:text-blue-700 ${data.some((d) => d.active) ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
+                        onClick={() => {
+                          if (data.some((d) => d.active)) return;
+
+                          const allEdit = data[0].editMode;
+                          const updated = data.map((item) => ({
+                            ...item,
+                            editMode: !allEdit,
+                          }));
+                          setData(updated);
+                        }}
+                        disabled={data.some((d) => d.active)}
+                      >
+                        <FaPencilAlt size={16} />
+                      </button>
+                    </td>
+                  )}
+
                 </tr>
               ))}
             </tbody>
+
           </table>
         </div>
       </div>
