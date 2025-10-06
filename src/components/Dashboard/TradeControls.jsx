@@ -7,41 +7,14 @@ import axios from "axios";
 
 const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade, spreadSize, setSpreadSize }) => {
 
-  // useEffect(() => {
-  //   if (data.length === 0) return;
-
-  //   // Only run when all editMode are false
-  //   const anyEditing = data.some(d => d.editMode);
-  //   if (anyEditing) return;
-
-  //   handleGetToken();
-  // }, [
-  //   JSON.stringify(
-  //     data.map(d => ({
-  //       instrument: d.instrument,
-  //       strikePrice: d.strikePrice,
-  //       dateOfContract: d.dateOfContract,
-  //       type: d.type,
-  //       editMode: d.editMode    // <-- Added
-  //     }))
-  //   )
-  // ]);
   useEffect(() => {
     if (data.length === 0) return;
 
-    // 🚫 Stop if any row is being edited
+    // Only run when all editMode are false
     const anyEditing = data.some(d => d.editMode);
     if (anyEditing) return;
 
-    // 🚫 Stop if any row is active
-    const anyActive = data.some(d => d.active);
-    if (anyActive) return;
-    console.log('Fetching tokens as no rows are being edited or active');
-    // ✅ Run only when no editMode and no active rows
-    const interval = setInterval(() => {
-      handleGetToken();
-    }, 60000);
-    return () => clearInterval(interval);
+    handleGetToken();
   }, [
     JSON.stringify(
       data.map(d => ({
@@ -49,11 +22,47 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
         strikePrice: d.strikePrice,
         dateOfContract: d.dateOfContract,
         type: d.type,
-        editMode: d.editMode,
-        // active: d.active,   // <-- added to trigger when active changes
+        editMode: d.editMode    // <-- Added
       }))
     )
   ]);
+  // useEffect(() => {
+  //   if (data.length === 0) return; 
+    
+  //   const interval = setInterval(() => {
+  //     handleGetToken();
+  //   }, 60000);
+  //   return () => clearInterval(interval);
+
+  // },[])
+  // useEffect(() => {
+  //   if (data.length === 0) return;
+
+  //   // 🚫 Stop if any row is being edited
+  //   const anyEditing = data.some(d => d.editMode);
+  //   if (anyEditing) return;
+
+  //   // 🚫 Stop if any row is active
+  //   const anyActive = data.some(d => d.active);
+  //   if (anyActive) return;
+  //   console.log('Fetching tokens as no rows are being edited or active');
+  //   // ✅ Run only when no editMode and no active rows
+  //   const interval = setInterval(() => {
+  //     handleGetToken();
+  //   }, 60000);
+  //   return () => clearInterval(interval);
+  // }, [
+  //   JSON.stringify(
+  //     data.map(d => ({
+  //       instrument: d.instrument,
+  //       strikePrice: d.strikePrice,
+  //       dateOfContract: d.dateOfContract,
+  //       type: d.type,
+  //       editMode: d.editMode,
+  //       // active: d.active,   // <-- added to trigger when active changes
+  //     }))
+  //   )
+  // ]);
   const { ceData, peData } = useWebSocket();
   useEffect(() => {
     if (!ceData && !peData) return;
