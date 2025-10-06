@@ -230,7 +230,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
     const updatedFunds = funds.map((fund, index) => {
       const investableAmount = parseInt(fund.investable_amount);
       const lotSize = parseInt(data[index]?.lotSize); // use correct lotSize per instrument
-      console.log(lotSize, "lotSize");
+      console.log(investableAmount, "lotSize");
 
       if (!investableAmount || !lotSize) {
         console.error(`Invalid fund at index ${index}`);
@@ -238,16 +238,16 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       }
       console.log(investableAmount / (ltp * lotSize), "investableAmount");
 
-      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize * 1.015));
+      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
       const quantity = numberOfLots * lotSize;
 
       console.log(
         `${type} => LTP: ${ltp}, Lots: ${numberOfLots}, Qty: ${quantity}`
       );
 
-      if (type === 'CALL') {
+      if (type == 'CALL') {
         return { ...fund, call_quantity: Math.round(quantity), call_lot: lotSize };
-      } else if (type === 'PUT') {
+      } else if (type == 'PUT') {
         return { ...fund, put_quantity: Math.round(quantity), put_lot: lotSize };
       } else {
         return { ...fund };
