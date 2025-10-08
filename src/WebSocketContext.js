@@ -165,7 +165,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
         }
 
         // ✅ Handle success scenario
-        if (data.message === "Order placed successfully...Waiting for square off") {
+        if (data.message == "Order placed successfully...Waiting for square off") {
           setTradeData((prev) =>
             prev.map((item) =>
               item.status === "Vigilant" && data.Type === (item.type === "CALL" ? "CE" : "PE")
@@ -173,10 +173,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
                   ...item,
                   status: "Waiting for Square-Off",
                   buyInLTP: data?.BUY_LTP,
-                  pl:
-                    data?.ltp && item.buyInLTP
-                      ? (100 * ((data?.ltp - item.buyInLTP) / item.buyInLTP)).toFixed(2)
-                      : 0
+                  pl:pnl_percentage
                 }
                 : item
             )
@@ -196,7 +193,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
           setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
-              pl: data?.pnl_percent
+              pl: data?.pnl_percentage
             }))
           );
         }
@@ -209,7 +206,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
             prev.map(item => ({
               ...item,
               status: "Waiting for Square-Off",
-              buyInLTP: data?.ltp ?? item.buyInLTP,
+              buyInLTP: data?.BUY_LTP,
               ltpLocked: data?.locked_LTP ?? item.ltpLocked,
               pl: data?.pnl_percent ?? item.pl
             }))
@@ -226,10 +223,8 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
                 ? {
                   ...item,
                   status: "Orders Selled",
-                  buyInLTP: data?.ltp,
-                  pl: data?.ltp && data?.ltp !== 0
-                    ? (100 * ((data?.ltp - data?.ltp) / data?.ltp))
-                    : 0
+                  buyInLTP: data?.BUY_LTP,
+                  pl:pnl_percentage
                 }
                 : item
             )
@@ -238,9 +233,9 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
             prev.map(item => ({
               ...item,
               status: "Sell Orders",
-              buyInLTP: data?.ltp ?? item.buyInLTP,
+              buyInLTP:data?.BUY_LTP,
               ltpLocked: data?.locked_LTP ?? item.ltpLocked,
-              pl: data?.pnl_percent ?? item.pl
+              pl: pnl_percentage
             }))
           );
           // ✅ Close socket & stop reconnect
