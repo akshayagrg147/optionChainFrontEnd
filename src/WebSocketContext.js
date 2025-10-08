@@ -500,10 +500,10 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
       target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
       step: parseFloat(spreadSize) ?? 0.25,
       profit_percent: parseFloat(rtpValue) ?? 0.5,
-      total_amount: parseInt(user?.funds),
+      total_amount: parseFloat(user?.funds),
       quantityCE: user?.call_quantity,
       quantityPE: user?.put_quantity,
-      investable_amount: parseInt(user?.investable_amount),
+      investable_amount: parseFloat(user?.investable_amount),
       lot: parseInt(user.call_lot),
       reverseTrade: reverseTrade ? "ON" : "OFF",
     };
