@@ -238,7 +238,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       }
       console.log(investableAmount / (ltp * lotSize), "investableAmount");
 
-      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize));
+      const numberOfLots = Math.floor(investableAmount / (ltp * lotSize * 1.015));
       const quantity = numberOfLots * lotSize;
 
       console.log(
