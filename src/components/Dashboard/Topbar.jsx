@@ -92,29 +92,46 @@ const Topbar = () => {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+  const downloadLog = async () => {
+    try {
+      const baseURL = process.env.REACT_APP_BASE_URL // adjust
+      const response = await axios.get(`${baseURL}api/download-log/`, {
+        responseType: 'blob', // Important for file download
+      });
 
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'logs.txt'); // or whatever file name you want
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Error downloading the log file:', error);
+      alert('Failed to download logs.');
+    }
+  };
   return (
     <div className="bg-white px-6 py-3 shadow-sm border-b border-gray-200 flex justify-between items-center">
       {/* Left Side Buttons */}
       <div className="flex gap-4">
         <button
           onClick={() => setActive("live")}
-          className={`px-4 py-1 text-sm rounded-full font-medium ${
-            active === "live"
+          className={`px-4 py-1 text-sm rounded-full font-medium ${active === "live"
               ? "bg-green-600 text-white"
               : "bg-white text-gray-700 hover:bg-green-50"
-          }`}
+            }`}
         >
           Live Trading
         </button>
 
         <button
           onClick={() => setActive("simulation")}
-          className={`px-4 py-1 text-sm rounded-full font-medium ${
-            active === "simulation"
+          className={`px-4 py-1 text-sm rounded-full font-medium ${active === "simulation"
               ? "bg-yellow-500 text-white"
               : "bg-white text-gray-700 hover:bg-yellow-50"
-          }`}
+            }`}
         >
           Simulation
         </button>
@@ -124,6 +141,11 @@ const Topbar = () => {
             Manual Trade Setup
           </button>
         </Link>
+        {/*<Link to={"/manual-trade"}> */}
+        <button onClick={() => downloadLog()} className="bg-red-500 text-white px-4 py-1 rounded hover:bg-gray-400 text-sm">
+          Download Logs
+        </button>
+        {/*</Link>*/}
 
         {/* 📌 Upload CSV */}
         <button
@@ -135,7 +157,7 @@ const Topbar = () => {
         </button>
         <input
           type="file"
-           accept=".csv, .xls, .xlsx"
+          accept=".csv, .xls, .xlsx"
           ref={fileInputRef}
           onChange={handleFileChange}
           className="hidden"

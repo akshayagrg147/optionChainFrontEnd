@@ -173,7 +173,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
                   ...item,
                   status: "Waiting for Square-Off",
                   buyInLTP: data?.BUY_LTP,
-                  pl:pnl_percentage
+                  pl:data?.pnl_percentage
                 }
                 : item
             )
@@ -224,7 +224,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
                   ...item,
                   status: "Orders Selled",
                   buyInLTP: data?.BUY_LTP,
-                  pl:pnl_percentage
+                  pl:data?.pnl_percentage
                 }
                 : item
             )
@@ -235,7 +235,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
               status: "Sell Orders",
               buyInLTP:data?.BUY_LTP,
               ltpLocked: data?.locked_LTP ?? item.ltpLocked,
-              pl: pnl_percentage
+              pl: data?.pnl_percentage
             }))
           );
           // ✅ Close socket & stop reconnect
