@@ -499,6 +499,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
       quantityCE: user?.call_quantity,
       quantityPE: user?.put_quantity,
       investable_amount: parseFloat(user?.investable_amount),
+      api_key: user?.api_key ?? "",
       lot: parseInt(user.call_lot),
       reverseTrade: reverseTrade ? "ON" : "OFF",
     };
