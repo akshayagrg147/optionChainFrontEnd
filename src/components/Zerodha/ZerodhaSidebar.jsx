@@ -222,17 +222,12 @@ const ZerodhaSidebar = () => {
 
     for (const fund of storedFunds) {
       try {
-        const res = await axios.get(
-          "https://api.kite.trade/user/margins",
-          {
-            headers: {
-              "X-Kite-Version": "3",
-              Authorization: `token ${fund.api_key}:${fund.zerodha_token}`,
-            },
-          }
+        const res = await axios.post(
+          `${process.env.REACT_APP_BASE_URL}api/zerodha/funds/`,
+          { api_key: fund.api_key, access_token: fund.zerodha_token }
         );
 
-        const fetchedFund = res.data.data; // Zerodha returns inside 'data'
+        const fetchedFund = res.data; // Zerodha returns inside 'data'
         const fundAmount = Number(fetchedFund.equity?.available?.live_balance || 0);
 
         const percentage = Number(fund.percentage || 0);
