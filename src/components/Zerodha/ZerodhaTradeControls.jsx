@@ -3,10 +3,11 @@ import { FaPencilAlt } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useWebSocket } from "../../WebSocketContext";
 import axios from "axios";
+import { useZerodhaWebSocket } from "../../ZerodhaWebSocketContext";
 import { toast, ToastContainer } from "react-toastify";
 
 
-const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade, spreadSize, setSpreadSize }) => {
+const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade, spreadSize, setSpreadSize }) => {
 
   useEffect(() => {
     if (data.length === 0) return;
@@ -64,7 +65,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   //     }))
   //   )
   // ]);
-  const { ceData, peData } = useWebSocket();
+  const { ceData, peData } = useZerodhaWebSocket();
   useEffect(() => {
     if (!ceData && !peData) return;
 
@@ -178,7 +179,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
 
   // ✅ countLtp now accepts type
   const countLtp = async (instrument_key, type) => {
-    const fundsData = JSON.parse(localStorage.getItem('funds'));
+    const fundsData = JSON.parse(localStorage.getItem('zerodha-funds'));
     console.log(fundsData, 'fundsData');
 
     const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
@@ -220,7 +221,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       return;
     }
 
-    const fundsRaw = localStorage.getItem('funds');
+    const fundsRaw = localStorage.getItem('zerodha-funds');
     if (!fundsRaw) {
       console.error('No funds found in localStorage');
       return;
@@ -255,7 +256,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
       }
     });
 
-    localStorage.setItem('funds', JSON.stringify(updatedFunds));
+    localStorage.setItem('zerodha-funds', JSON.stringify(updatedFunds));
     console.log('Updated funds saved with LTP calculation.');
   }
 
@@ -560,5 +561,5 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   );
 };
 
-export default TradeTable;
+export default ZerodhaTradeTable;
 

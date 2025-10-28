@@ -204,7 +204,7 @@ const DryManualTradeUI = () => {
           setInstrumentKey(result.results[0].instrument_key || "");
         }
       } else {
-        alert("❌ Failed to Tracking.");
+        toast.error("❌ Failed to Tracking.");
       }
     } catch (error) {
       console.error("API error:", error);

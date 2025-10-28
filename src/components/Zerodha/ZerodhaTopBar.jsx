@@ -4,7 +4,7 @@ import NotificationPanel from "../../Common/Notification";
 import { FaBell } from "react-icons/fa";
 import axios from "axios";
 
-const Topbar = () => {
+const ZerodhaTopbar = () => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [active, setActive] = useState("live");
   const [uploading, setUploading] = useState(false);
@@ -164,8 +164,8 @@ const Topbar = () => {
           className="hidden"
         />
       </div>
-      <button onClick={()=>navigate('/zerodha')} className="bg-purple-500 text-white px-4 py-1 rounded hover:bg-gray-400 text-sm">
-        Zerodha
+      <button onClick={()=>navigate('/')} className="bg-purple-500 text-white px-4 py-1 rounded hover:bg-gray-400 text-sm">
+        Upstox
       </button>
       {/* Right Side Buttons */}
       <div className="flex items-center gap-3">
@@ -197,4 +197,4 @@ const Topbar = () => {
   );
 };
 
-export default Topbar;
+export default ZerodhaTopbar;

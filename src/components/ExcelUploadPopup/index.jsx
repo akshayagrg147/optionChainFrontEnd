@@ -60,6 +60,8 @@ const ExcelUploadPopup = ({ isOpen, onClose, accounts, fetchAccounts }) => {
             put_lot: row["Put Lot"] || 0,
             token: row["token"],
             sandbox_token: row["sandboxToken"],
+            zerodha_token: row["zerodha Token"],
+            api_key: row["zerodha Api Key"],
           };
 
           await axios.post(`${process.env.REACT_APP_BASE_URL}fund-instrument/`, excel_data, {

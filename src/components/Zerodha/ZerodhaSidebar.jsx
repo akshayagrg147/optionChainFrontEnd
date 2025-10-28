@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { FaCaretUp, FaSortDown, FaTrash } from "react-icons/fa";
 import { FaUpload } from "react-icons/fa6";
 import ExcelUploadPopup from "../ExcelUploadPopup";
-import AddAccountPopup from "./AddAccountPopup";
+
 import axios from "axios";
 import { toast } from "react-toastify";
 import { PiMicrosoftExcelLogo } from "react-icons/pi";
 import * as XLSX from "xlsx";
 import { Link } from "react-router-dom";
+import AddAccountPopup from "../Dashboard/AddAccountPopup";
 
-const Sidebar = () => {
+const ZerodhaSidebar = () => {
   const [accounts, setAccounts] = useState([]);
   const [accordionOpen, setAccordionOpen] = useState({});
   const [applyValue, setApplyValue] = useState("");
@@ -51,7 +52,6 @@ const Sidebar = () => {
       if (res.data.length === 0) {
         setIsOpenPopup(true);
       } else {
-        console.log(res.data, "res.data");
 
         const fundsData = res.data.map((f, i) => ({
           id: i + 1,
@@ -62,8 +62,15 @@ const Sidebar = () => {
           percentage: parseInt(f?.percentage),
           sandBoxToken: f['sanbox token'],
           status: 'Pending',
+          zerodha_token: f.zerodha_token,
+          api_key: f.api_key
         }));
-        localStorage.setItem('funds', JSON.stringify(fundsData));
+        console.log(fundsData, "res.data");
+        
+        localStorage.setItem('zerodha-funds', JSON.stringify(fundsData));
+        const getData = JSON.parse(localStorage.getItem('zerodha-funds'));
+        console.log(getData, "getData");
+        
       }
 
       const openState = {};
@@ -87,7 +94,7 @@ const Sidebar = () => {
 
 
   useEffect(() => {
-    const updatedFunds = accounts.map(({ id, name, token, lotSize, invest_amount, sandbox_token, status, percentage, funds, investable_amount, call_lot, put_lot }) => ({
+    const updatedFunds = accounts.map(({ id, name, token, lotSize, invest_amount, sandbox_token, status, percentage, funds, investable_amount, call_lot, put_lot,zerodha_token ,api_key }) => ({
       id,
       name,
       token,
@@ -99,78 +106,139 @@ const Sidebar = () => {
       funds,
       investable_amount,
       call_lot,
-      put_lot
+      put_lot,
+      zerodha_token,
+      api_key
     }));
-    localStorage.setItem("funds", JSON.stringify(updatedFunds));
+    console.log(updatedFunds,"updatedFunds");
+    
+    localStorage.setItem("zerodha-funds", JSON.stringify(updatedFunds));
   }, [accounts]);
 
+  // const fundCheck = async () => {
+  //   const storedFunds = JSON.parse(localStorage.getItem('zerodha-funds') || '[]');
+
+  //   if (!storedFunds.length) {
+  //     toast.error("No funds found in local storage.");
+  //     return;
+  //   }
+
+  //   const updatedFunds = [];
+  //   let updatedAccounts = [...storedFunds]; // work with a local copy
+
+
+  //   for (const fund of storedFunds) {
+  //     try {
+  //       const res = await axios.get(`https://api.kite.trade/user/margins`, {
+  //         headers: {
+  //           Authorization: `Bearer ${fund.token}`,
+  //         },
+  //       });
+
+  //       const fetchedFund = res.data;
+  //       const fundAmount = Number(fetchedFund.margins?.available_margin || 0);
+  //       // setAccounts((prev) =>
+  //       //   prev.map((acc) => ({
+  //       //     ...acc,
+  //       //     name:  res?.data?.user_name
+  //       //   }))
+  //       // );
+  //       // console.log(accounts,fund, "accounts");
+
+  //       // const percentage = Number(
+  //       //   accounts.find((acc) => acc.name === fund.name)?.percentage || 0
+  //       // );
+  //       // const investableAmount = (fundAmount * percentage) / 100;
+  //       // console.log(investableAmount, percentage, "investableAmount");
+
+  //       // // Update state
+  //       // setAccounts((prev) =>
+  //       //   prev.map((acc) =>
+  //       //     acc.name === fund.name
+  //       //       ? {
+  //       //         ...acc,
+  //       //         funds: fundAmount,
+  //       //         investable_amount: investableAmount.toFixed(2),
+  //       //       }
+  //       //       : acc
+  //       //   )
+  //       // );
+
+  //       // // Prepare updated local storage item
+  //       // updatedFunds.push({
+  //       //   ...fund,
+  //       //   funds: fundAmount,
+  //       //   investable_amount: investableAmount.toFixed(2),
+  //       // });
+  //       setAccounts((prev) =>
+  //         prev.map((acc) =>
+  //           acc.token === fund.token
+  //             ? { ...acc, name: fetchedFund.user_name }
+  //             : acc
+  //         )
+  //       );
+
+  //       const percentage = Number(fund.percentage || 0);
+  //       const investableAmount = (fundAmount * percentage) / 100;
+  //       console.log(investableAmount, percentage, "investableAmount");
+
+  //       setAccounts((prev) =>
+  //         prev.map((acc) =>
+  //           acc.token === fund.token
+  //             ? {
+  //               ...acc,
+  //               funds: fundAmount,
+  //               investable_amount: investableAmount.toFixed(2),
+  //             }
+  //             : acc
+  //         )
+  //       );
+
+  //       updatedFunds.push({
+  //         ...fund,
+  //         funds: fundAmount,
+  //         investable_amount: investableAmount.toFixed(2),
+  //       });
+  //     } catch (err) {
+  //       console.error(`Error fetching fund for ${fund.name}:`, err);
+  //     }
+  //   }
+
+  //   // Update localStorage after all API calls
+  //   localStorage.setItem('zerodha-funds', JSON.stringify(updatedFunds));
+  // };
+
+
+
   const fundCheck = async () => {
-    const storedFunds = JSON.parse(localStorage.getItem('funds') || '[]');
+    const storedFunds = JSON.parse(localStorage.getItem('zerodha-funds'));
 
     if (!storedFunds.length) {
-      toast.error("No funds found in local storage.");
+      toast.error("No Zerodha funds found in local storage.");
       return;
     }
 
     const updatedFunds = [];
-    let updatedAccounts = [...storedFunds]; // work with a local copy
-
 
     for (const fund of storedFunds) {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_BASE_URL}api/upstox/funds/`, {
-          headers: {
-            Authorization: `Bearer ${fund.token}`,
-          },
-        });
-
-        const fetchedFund = res.data;
-        const fundAmount = Number(fetchedFund.margins?.available_margin || 0);
-        // setAccounts((prev) =>
-        //   prev.map((acc) => ({
-        //     ...acc,
-        //     name:  res?.data?.user_name
-        //   }))
-        // );
-        // console.log(accounts,fund, "accounts");
-
-        // const percentage = Number(
-        //   accounts.find((acc) => acc.name === fund.name)?.percentage || 0
-        // );
-        // const investableAmount = (fundAmount * percentage) / 100;
-        // console.log(investableAmount, percentage, "investableAmount");
-
-        // // Update state
-        // setAccounts((prev) =>
-        //   prev.map((acc) =>
-        //     acc.name === fund.name
-        //       ? {
-        //         ...acc,
-        //         funds: fundAmount,
-        //         investable_amount: investableAmount.toFixed(2),
-        //       }
-        //       : acc
-        //   )
-        // );
-
-        // // Prepare updated local storage item
-        // updatedFunds.push({
-        //   ...fund,
-        //   funds: fundAmount,
-        //   investable_amount: investableAmount.toFixed(2),
-        // });
-        setAccounts((prev) =>
-          prev.map((acc) =>
-            acc.token === fund.token
-              ? { ...acc, name: fetchedFund.user_name }
-              : acc
-          )
+        const res = await axios.get(
+          "https://api.kite.trade/user/margins",
+          {
+            headers: {
+              "X-Kite-Version": "3",
+              Authorization: `token ${fund.api_key}:${fund.zerodha_token}`,
+            },
+          }
         );
+
+        const fetchedFund = res.data.data; // Zerodha returns inside 'data'
+        const fundAmount = Number(fetchedFund.equity?.available?.live_balance || 0);
 
         const percentage = Number(fund.percentage || 0);
         const investableAmount = (fundAmount * percentage) / 100;
-        console.log(investableAmount, percentage, "investableAmount");
 
+        // Update UI (optional)
         setAccounts((prev) =>
           prev.map((acc) =>
             acc.token === fund.token
@@ -188,15 +256,15 @@ const Sidebar = () => {
           funds: fundAmount,
           investable_amount: investableAmount.toFixed(2),
         });
+
       } catch (err) {
-        console.error(`Error fetching fund for ${fund.name}:`, err);
+        console.error(`Error fetching Zerodha fund for ${fund.name}:`, err);
+        toast.error(`Failed to fetch fund for ${fund.name}`);
       }
     }
 
-    // Update localStorage after all API calls
-    localStorage.setItem('funds', JSON.stringify(updatedFunds));
+    localStorage.setItem('zerodha-funds', JSON.stringify(updatedFunds));
   };
-
 
 
 
@@ -205,7 +273,7 @@ const Sidebar = () => {
       const updated = prev.map((acc) =>
         acc.id === id ? { ...acc, [field]: value } : acc
       );
-      localStorage.setItem('funds', JSON.stringify(updated)); // optional if you use the useEffect
+      localStorage.setItem('zerodha-funds', JSON.stringify(updated)); // optional if you use the useEffect
       return updated;
     });
   };
@@ -287,7 +355,7 @@ const Sidebar = () => {
           max-h-screen">
         <div className="mb-3 flex justify-between items-center flex-wrap gap-3">
           <Link to="/" className="w-50 h-50 ">
-            <img src="/assets/upstox logo.png" className="w-[100px] h-[50px] object-contain cursor-pointer"/>
+            <img src="/assets/Zerodha logo.png" className="w-[100px] h-[50px] object-contain cursor-pointer" />
           </Link>
           <div>
             {/* <input
@@ -463,4 +531,4 @@ const Sidebar = () => {
   );
 };
 
-export default Sidebar;
+export default ZerodhaSidebar;

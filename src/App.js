@@ -13,6 +13,9 @@ import PrivateRoute from "./components/PrivateRoute";
 import { ManualWebSocketProvider } from "./ManualWebSocketContext";
 import UpstoxAuth from "./components/UpstoxAuth";
 import DryManualTradeUI from "./components/DryRunManualTrade";
+import ManualTradePage from "./Pages/ManualTradePage";
+import TestingManualTradePage from "./Pages/TestingManualPage";
+import ZerodhaDashboard from "./Pages/ZerodhaDashboard";
 
 
 function App() {
@@ -35,6 +38,14 @@ function App() {
           }
         />
         <Route
+          path="/zerodha"
+          element={
+            <PrivateRoute>
+              <ZerodhaDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/square-off"
           element={
             <PrivateRoute>
@@ -48,7 +59,7 @@ function App() {
             <PrivateRoute>
 
               <ManualWebSocketProvider>
-                <ManualTradeUI />
+                <ManualTradePage />
               </ManualWebSocketProvider>
             </PrivateRoute>
           }
@@ -57,9 +68,8 @@ function App() {
           path="/dry-manual-trade"
           element={
             <PrivateRoute>
-
               <ManualWebSocketProvider>
-                <DryManualTradeUI />
+                <TestingManualTradePage />
               </ManualWebSocketProvider>
             </PrivateRoute>
           }
