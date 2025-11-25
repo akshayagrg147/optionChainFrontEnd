@@ -180,7 +180,6 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   const countLtp = async (instrument_key, type) => {
     const fundsData = JSON.parse(localStorage.getItem('funds'));
     console.log(fundsData, 'fundsData');
-
     const url = `https://api.upstox.com/v2/market-quote/ltp?instrument_key=${instrument_key}`;
     const headers = {
       Accept: 'application/json',

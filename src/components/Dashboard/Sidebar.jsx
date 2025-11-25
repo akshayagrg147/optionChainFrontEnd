@@ -57,12 +57,17 @@ const Sidebar = () => {
           id: i + 1,
           name: f.name,
           token: f.token,
+          app_type: f.type,
+          zerodha_token: f.zerodha_token,
+          api_key: f.api_key,
           lotSize: '',
           invest_amount: '',
           percentage: parseInt(f?.percentage),
           sandBoxToken: f['sanbox token'],
           status: 'Pending',
         }));
+        console.log(fundsData, "fundsData");
+
         localStorage.setItem('funds', JSON.stringify(fundsData));
       }
 
@@ -87,7 +92,7 @@ const Sidebar = () => {
 
 
   useEffect(() => {
-    const updatedFunds = accounts.map(({ id, name, token, lotSize, invest_amount, sandbox_token, status, percentage, funds, investable_amount, call_lot, put_lot }) => ({
+    const updatedFunds = accounts.map(({ id, name, token, lotSize, invest_amount, sandbox_token, status, percentage, funds, investable_amount, call_lot, put_lot, type, zerodha_token, api_key }) => ({
       id,
       name,
       token,
@@ -99,7 +104,10 @@ const Sidebar = () => {
       funds,
       investable_amount,
       call_lot,
-      put_lot
+      put_lot,
+      type,
+      zerodha_token,
+      api_key
     }));
     localStorage.setItem("funds", JSON.stringify(updatedFunds));
   }, [accounts]);
@@ -117,15 +125,27 @@ const Sidebar = () => {
 
 
     for (const fund of storedFunds) {
+      console.log(fund);
+      
       try {
-        const res = await axios.get(`${process.env.REACT_APP_BASE_URL}api/upstox/funds/`, {
-          headers: {
-            Authorization: `Bearer ${fund.token}`,
-          },
-        });
+        let res = null;
+        if (fund.app_type == 'upstox') {
+          res = await axios.get(`${process.env.REACT_APP_BASE_URL}api/upstox/funds/`, {
+            headers: {
+              Authorization: `Bearer ${fund.token}`,
+            },
+          });
+        }
+        if (fund.app_type == "zerodha") {
+          res = await axios.post(
+            `${process.env.REACT_APP_BASE_URL}api/zerodha/funds/`,
+            { api_key: fund.api_key, access_token: fund.zerodha_token }
+          );
+        }
+
 
         const fetchedFund = res.data;
-        const fundAmount = Number(fetchedFund.margins?.available_margin || 0);
+        const fundAmount = fund.app_type == 'upstox' ?  Number(fetchedFund.margins?.available_margin || 0) :  Number(fetchedFund.equity?.available?.live_balance || 0);;
         // setAccounts((prev) =>
         //   prev.map((acc) => ({
         //     ...acc,
@@ -192,6 +212,7 @@ const Sidebar = () => {
         console.error(`Error fetching fund for ${fund.name}:`, err);
       }
     }
+
 
     // Update localStorage after all API calls
     localStorage.setItem('funds', JSON.stringify(updatedFunds));
@@ -287,7 +308,7 @@ const Sidebar = () => {
           max-h-screen">
         <div className="mb-3 flex justify-between items-center flex-wrap gap-3">
           <Link to="/" className="w-50 h-50 ">
-            <img src="/assets/upstox logo.png" className="w-[100px] h-[50px] object-contain cursor-pointer"/>
+            <img src="/assets/upstox logo.png" className="w-[100px] h-[50px] object-contain cursor-pointer" />
           </Link>
           <div>
             {/* <input

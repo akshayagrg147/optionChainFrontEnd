@@ -17,7 +17,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
   useEffect(() => {
     tradeDataRef.current = tradeData;
   }, [tradeData]);
-  const socketUrl = process.env.REACT_APP_WEB_SOCKET_URL;
+  const socketUrl = process.env.REACT_APP_ZERODHA_WEB_SOCKET_URL;
   console.log(tradeData, "socketUrl");
   const connectWebSocket = () => {
     if (!socketUrl) {
@@ -32,7 +32,6 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
       console.log("✅ WebSocket connected");
       setIsSocketReady(true);
     };
-    console.log(tradeData, "tradeDatatradeData");
     // socket.onmessage = (event) => {
     //   try {
     //     const data = JSON.parse(event.data);
@@ -173,7 +172,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
                   ...item,
                   status: "Waiting for Square-Off",
                   buyInLTP: data?.BUY_LTP,
-                  pl:data?.pnl_percentage
+                  pl: data?.pnl_percentage
                 }
                 : item
             )
@@ -195,6 +194,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
               ...item,
               pl: data?.pnl_percentage
             }))
+
           );
         }
 
@@ -223,8 +223,8 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
                 ? {
                   ...item,
                   status: "Orders Selled",
-                  buyInLTP: data?.BUY_LTP,
-                  pl:data?.pnl_percentage
+                  buyInLTP: data?.SELL_LTP,
+                  pl: data?.pnl_percentage
                 }
                 : item
             )
@@ -233,7 +233,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
             prev.map(item => ({
               ...item,
               status: "Sell Orders",
-              buyInLTP:data?.BUY_LTP,
+              buyInLTP: data?.SELL_LTP,
               ltpLocked: data?.locked_LTP ?? item.ltpLocked,
               pl: data?.pnl_percentage
             }))
@@ -250,13 +250,19 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           // setIsSocketReady(false);
         }
         // }
-
+        if (data.message == "Trading completed - No reverse trade") {
+          if (socketRef.current) socketRef.current.close();
+          socket.onclose = (event) => {
+            console.warn(`🔌 WebSocket closed (code: ${event.code}). Reconnecting...`);
+            setIsSocketReady(false);
+          };
+        }
 
         // ✅ Update CE / PE data ONLY if strike + type match in tradeData
         const matchedTrade = tradeDataRef.current.find(
           (t) =>
-            (parseInt(t.strikePrice) === data.strike && t.type === "CALL" && data.type === "CE") ||
-            (parseInt(t.strikePrice) === data.strike && t.type === "PUT" && data.type === "PE")
+            (t.type === "CALL" && data.type === "CE") ||
+            (t.type === "PUT" && data.type === "PE")
         );
 
         console.log("✅ Updating CE/PE data for:", matchedTrade);
@@ -268,7 +274,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           // example update to tradeData
           setTradeData((prev) =>
             prev.map((item) =>
-              item.strikePrice === matchedTrade.strikePrice && item.type === matchedTrade.type
+              item.type === matchedTrade.type
                 ? { ...item, ltpLocked: data?.locked_LTP ?? item.ltpLocked }
                 : item
             )
@@ -459,64 +465,63 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
     //     }
     //   });
     // });
- if (tokenData && tokenData.length > 0) {
-  tokenData.forEach((user, index) => {
-    // pick the trade based on token index
-    const trade = newTradesToSend[index] || newTradesToSend[0]; // fallback to first trade if index > available
+    if (tokenData && tokenData.length > 0) {
+      tokenData.forEach((user, index) => {
+        // pick the trade based on token index
+        const trade = newTradesToSend[index] || newTradesToSend[0]; // fallback to first trade if index > available
 
-    let ceToken = trade.trading_symbol || "";
-    let peToken = trade.trading_symbol_2 || "";
+        let ceToken = trade.trading_symbol || "";
+        let peToken = trade.trading_symbol_2 || "";
 
-    // ✅ Special case for CALL leg without PE
-    if (trade.type === "CALL" && !trade.trading_symbol_2) {
-      const matchingPut = tradeData.find(
-        (t) =>
-          t.instrument === trade.instrument &&
-          t.dateOfContract === trade.dateOfContract &&
-          t.type === "PUT"
-      );
-      if (matchingPut) {
-        peToken =
-          matchingPut.trading_symbol_2 ||
-          matchingPut.trading_symbol ||
-          "";
-      }
+        // ✅ Special case for CALL leg without PE
+        if (trade.type === "CALL" && !trade.trading_symbol_2) {
+          const matchingPut = tradeData.find(
+            (t) =>
+              t.instrument === trade.instrument &&
+              t.dateOfContract === trade.dateOfContract &&
+              t.type === "PUT"
+          );
+          if (matchingPut) {
+            peToken =
+              matchingPut.trading_symbol_2 ||
+              matchingPut.trading_symbol ||
+              "";
+          }
+        }
+
+        const message = {
+          index_name: `${trade.instrument === "NIFTY" ? "NIFTY" : trade.instrument
+            }`,
+          // expiry_date: trade.dateOfContract || "2025-07-24",
+          access_token: user.zerodha_token,
+          trading_symbol: ceToken,
+          trading_symbol_2: peToken,
+          target_market_price_CE: trade?.targetMarketCE || 0,
+          target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
+          step: parseFloat(spreadSize) ?? 0.25,
+          profit_percent: parseFloat(rtpValue) ?? 0.5,
+          total_amount: parseFloat(user?.funds),
+          quantityCE: user?.call_quantity,
+          quantityPE: user?.put_quantity,
+          investable_amount: parseFloat(user?.investable_amount),
+          api_key: user?.api_key ?? "",
+          lot: parseInt(user.call_lot),
+          reverseTrade: reverseTrade ? "ON" : "OFF",
+        };
+
+        console.log("📤 Sending WebSocket message:", message);
+
+        try {
+          socketRef.current.send(JSON.stringify(message));
+          sentMessageMapRef.current.push({ token: user.token, id: user.id });
+        } catch (err) {
+          console.error("❌ Failed to send WebSocket message:", err);
+          updateFundsStatus(user.id, "Failed");
+        }
+      });
+    } else {
+      console.warn("⚠️ No tokenData found — skipping message send");
     }
-
-    const message = {
-      instrument_key: `NSE_INDEX|${
-        trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument
-      }`,
-      expiry_date: trade.dateOfContract || "2025-07-24",
-      zerodha_token: user.zerodha_token,
-      trading_symbol: ceToken,
-      trading_symbol_2: peToken,
-      target_market_price_CE: trade?.targetMarketCE || 0,
-      target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
-      step: parseFloat(spreadSize) ?? 0.25,
-      profit_percent: parseFloat(rtpValue) ?? 0.5,
-      total_amount: parseFloat(user?.funds),
-      quantityCE: user?.call_quantity,
-      quantityPE: user?.put_quantity,
-      investable_amount: parseFloat(user?.investable_amount),
-      api_key: user?.api_key ?? "",
-      lot: parseInt(user.call_lot),
-      reverseTrade: reverseTrade ? "ON" : "OFF",
-    };
-
-    console.log("📤 Sending WebSocket message:", message);
-
-    try {
-      socketRef.current.send(JSON.stringify(message));
-      sentMessageMapRef.current.push({ token: user.token, id: user.id });
-    } catch (err) {
-      console.error("❌ Failed to send WebSocket message:", err);
-      updateFundsStatus(user.id, "Failed");
-    }
-  });
-} else {
-  console.warn("⚠️ No tokenData found — skipping message send");
-}
 
   };
 
@@ -619,9 +624,9 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
     const updatedFunds = funds.map((fund) =>
       fund.id === id ? { ...fund, status: newStatus } : fund
     );
-    console.log(updatedFunds, "updatedFunds"); -
+    console.log(updatedFunds, "updatedFunds");
 
-      localStorage.setItem("zerodha-funds", JSON.stringify(updatedFunds));
+    localStorage.setItem("zerodha-funds", JSON.stringify(updatedFunds));
     // This will trigger `storage` event in other tabs
   };
   return (

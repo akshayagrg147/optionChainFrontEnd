@@ -66,6 +66,8 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
   //   )
   // ]);
   const { ceData, peData } = useZerodhaWebSocket();
+  console.log(ceData, peData, "ceDatapeData");
+  
   useEffect(() => {
     if (!ceData && !peData) return;
 
@@ -74,10 +76,10 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
         if (item.editMode) return item;
 
         if (ceData && item.type === "CALL") {
-          return { ...item, liveInLTP: ceData.ltp, strikePrice: ceData.strike, currentMarket: ceData.spot_price };
+          return { ...item, liveInLTP: ceData.ltp, currentMarket: ceData.spot_price };
         }
         if (peData && item.type === "PUT") {
-          return { ...item, liveInLTP: peData.ltp, strikePrice: peData.strike, currentMarket: peData.spot_price };
+          return { ...item, liveInLTP: peData.ltp, currentMarket: peData.spot_price };
         }
         return item;
       })
@@ -304,7 +306,7 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
                           setData(updated);
                         }}
                       >
-                        <option value="Nifty Bank">Bank Nifty</option>
+                        <option value="BANKNIFTY">Bank Nifty</option>
                         <option value="NIFTY">Nifty</option>
                         <option value="FINNIFTY">Fin Nifty</option>
                         <option value="MIDCPNIFTY">MIDCPNIFTY</option>

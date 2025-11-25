@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useWebSocket } from "../../WebSocketContext";
 import { useZerodhaWebSocket } from "../../ZerodhaWebSocketContext";
 
-const ZerodhaMarketTable = () => {
+const ZerodhaMarketTable = ({data}) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { ceData, peData } = useZerodhaWebSocket();
 
@@ -32,7 +32,7 @@ const ZerodhaMarketTable = () => {
             <thead className="bg-gray-100 text-gray-600 border-b">
               <tr>
                 <th className="px-4 py-2">Type</th>
-                <th className="px-4 py-2">Strike Price</th>
+                <th className="px-4 py-2">Current Market</th>
                 <th className="px-4 py-2">LTP</th>
               </tr>
             </thead>
@@ -40,14 +40,14 @@ const ZerodhaMarketTable = () => {
               {ceData && (
                 <tr className="border-b">
                   <td className="px-4 py-2 font-medium">CALL</td>
-                  <td className="px-4 py-2 font-medium">{ceData.strike}</td>
+                  <td className="px-4 py-2 font-medium">{ceData.spot_price}</td>
                   <td className="px-4 py-2 text-green-600">{ceData.ltp}</td>
                 </tr>
               )}
               {peData && (
                 <tr className="border-b">
                   <td className="px-4 py-2 font-medium">PUT</td>
-                  <td className="px-4 py-2 font-medium">{peData.strike}</td>
+                  <td className="px-4 py-2 font-medium">{peData.spot_price}</td>
                   <td className="px-4 py-2 text-green-600">{peData.ltp}</td>
                 </tr>
               )}

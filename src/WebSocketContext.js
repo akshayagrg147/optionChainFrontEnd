@@ -173,7 +173,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
                   ...item,
                   status: "Waiting for Square-Off",
                   buyInLTP: data?.BUY_LTP,
-                  pl:data?.pnl_percentage
+                  pl: data?.pnl_percentage
                 }
                 : item
             )
@@ -224,7 +224,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
                   ...item,
                   status: "Orders Selled",
                   buyInLTP: data?.BUY_LTP,
-                  pl:data?.pnl_percentage
+                  pl: data?.pnl_percentage
                 }
                 : item
             )
@@ -233,7 +233,7 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
             prev.map(item => ({
               ...item,
               status: "Sell Orders",
-              buyInLTP:data?.BUY_LTP,
+              buyInLTP: data?.BUY_LTP,
               ltpLocked: data?.locked_LTP ?? item.ltpLocked,
               pl: data?.pnl_percentage
             }))
@@ -459,64 +459,87 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     //     }
     //   });
     // });
- if (tokenData && tokenData.length > 0) {
-  tokenData.forEach((user, index) => {
-    // pick the trade based on token index
-    const trade = newTradesToSend[index] || newTradesToSend[0]; // fallback to first trade if index > available
+    if (tokenData && tokenData.length > 0) {
+      tokenData.forEach((user, index) => {
+        // pick the trade based on token index
+        const trade = newTradesToSend[index] || newTradesToSend[0]; // fallback to first trade if index > available
 
-    let ceToken = trade.trading_symbol || "";
-    let peToken = trade.trading_symbol_2 || "";
+        let ceToken = trade.trading_symbol || "";
+        let peToken = trade.trading_symbol_2 || "";
 
-    // ✅ Special case for CALL leg without PE
-    if (trade.type === "CALL" && !trade.trading_symbol_2) {
-      const matchingPut = tradeData.find(
-        (t) =>
-          t.instrument === trade.instrument &&
-          t.dateOfContract === trade.dateOfContract &&
-          t.type === "PUT"
-      );
-      if (matchingPut) {
-        peToken =
-          matchingPut.trading_symbol_2 ||
-          matchingPut.trading_symbol ||
-          "";
-      }
+        // ✅ Special case for CALL leg without PE
+        if (trade.type === "CALL" && !trade.trading_symbol_2) {
+          const matchingPut = tradeData.find(
+            (t) =>
+              t.instrument === trade.instrument &&
+              t.dateOfContract === trade.dateOfContract &&
+              t.type === "PUT"
+          );
+          if (matchingPut) {
+            peToken =
+              matchingPut.trading_symbol_2 ||
+              matchingPut.trading_symbol ||
+              "";
+          }
+        }
+        let message = {};
+        if (user.type === "upstox") {
+          message = {
+            instrument_key: `NSE_INDEX|${trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument
+              }`,
+            expiry_date: trade.dateOfContract || "2025-07-24",
+            access_token: user.token,
+            trading_symbol: ceToken,
+            trading_symbol_2: peToken,
+            target_market_price_CE: trade?.targetMarketCE || 0,
+            target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
+            step: parseFloat(spreadSize) ?? 0.25,
+            profit_percent: parseFloat(rtpValue) ?? 0.5,
+            total_amount: parseFloat(user?.funds),
+            quantityCE: user?.call_quantity,
+            quantityPE: user?.put_quantity,
+            investable_amount: parseFloat(user?.investable_amount),
+            // api_key: user?.api_key ?? "",
+            lot: parseInt(user.call_lot),
+            reverseTrade: reverseTrade ? "ON" : "OFF",
+          };
+        }
+        if (user.type === "zerodha") {
+          message = {
+            index_name: `${trade.instrument === "NIFTY" ? "NIFTY" : trade.instrument
+              }`,
+            // expiry_date: trade.dateOfContract || "2025-07-24",
+            access_token: user.zerodha_token,
+            trading_symbol: ceToken,
+            trading_symbol_2: peToken,
+            target_market_price_CE: trade?.targetMarketCE || 0,
+            target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
+            step: parseFloat(spreadSize) ?? 0.25,
+            profit_percent: parseFloat(rtpValue) ?? 0.5,
+            total_amount: parseFloat(user?.funds),
+            quantityCE: user?.call_quantity,
+            quantityPE: user?.put_quantity,
+            investable_amount: parseFloat(user?.investable_amount),
+            api_key: user?.api_key ?? "",
+            lot: parseInt(user.call_lot),
+            reverseTrade: reverseTrade ? "ON" : "OFF",
+          };
+        }
+
+
+        console.log("📤 Sending WebSocket message:", message);
+
+        try {
+          socketRef.current.send(JSON.stringify(message));
+          sentMessageMapRef.current.push({ token: user.token, id: user.id });
+        } catch (err) {
+          console.error("❌ Failed to send WebSocket message:", err);
+          updateFundsStatus(user.id, "Failed");
+        }
+      });
+    } else {
+      console.warn("⚠️ No tokenData found — skipping message send");
     }
-
-    const message = {
-      instrument_key: `NSE_INDEX|${
-        trade.instrument === "NIFTY" ? "Nifty 50" : trade.instrument
-      }`,
-      expiry_date: trade.dateOfContract || "2025-07-24",
-      access_token: user.token,
-      trading_symbol: ceToken,
-      trading_symbol_2: peToken,
-      target_market_price_CE: trade?.targetMarketCE || 0,
-      target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
-      step: parseFloat(spreadSize) ?? 0.25,
-      profit_percent: parseFloat(rtpValue) ?? 0.5,
-      total_amount: parseFloat(user?.funds),
-      quantityCE: user?.call_quantity,
-      quantityPE: user?.put_quantity,
-      investable_amount: parseFloat(user?.investable_amount),
-      api_key: user?.api_key ?? "",
-      lot: parseInt(user.call_lot),
-      reverseTrade: reverseTrade ? "ON" : "OFF",
-    };
-
-    console.log("📤 Sending WebSocket message:", message);
-
-    try {
-      socketRef.current.send(JSON.stringify(message));
-      sentMessageMapRef.current.push({ token: user.token, id: user.id });
-    } catch (err) {
-      console.error("❌ Failed to send WebSocket message:", err);
-      updateFundsStatus(user.id, "Failed");
-    }
-  });
-} else {
-  console.warn("⚠️ No tokenData found — skipping message send");
-}
 
   };
 
@@ -619,9 +642,9 @@ export const WebSocketProvider = ({ children, tradeData, setTradeData, setRtpVal
     const updatedFunds = funds.map((fund) =>
       fund.id === id ? { ...fund, status: newStatus } : fund
     );
-    console.log(updatedFunds, "updatedFunds"); -
+    console.log(updatedFunds, "updatedFunds");
 
-      localStorage.setItem("funds", JSON.stringify(updatedFunds));
+    localStorage.setItem("funds", JSON.stringify(updatedFunds));
     // This will trigger `storage` event in other tabs
   };
   return (
