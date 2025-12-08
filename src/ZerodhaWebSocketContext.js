@@ -512,8 +512,8 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
         console.log("📤 Sending WebSocket message:", message);
 
         try {
-          // socketRef.current.send(JSON.stringify(message));
-          // sentMessageMapRef.current.push({ token: user.token, id: user.id });
+          socketRef.current.send(JSON.stringify(message));
+          sentMessageMapRef.current.push({ token: user.token, id: user.id });
         } catch (err) {
           console.error("❌ Failed to send WebSocket message:", err);
           // updateFundsStatus(user.id, "Failed");
