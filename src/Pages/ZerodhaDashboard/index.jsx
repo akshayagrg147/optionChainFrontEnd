@@ -27,7 +27,6 @@ const initialRows = [
         active: false,
         editMode: false,
         trading_symbol: "NIFTY2571725200CE",
-        
     },
     {
         type: "PUT",

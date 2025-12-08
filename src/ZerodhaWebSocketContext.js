@@ -496,8 +496,8 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           access_token: user.zerodha_token,
           trading_symbol: ceToken,
           trading_symbol_2: peToken,
-          target_market_price_CE: trade?.targetMarketCE || 0,
-          target_market_price_PE: newTradesToSend[1]?.targetMarketPE || 0,
+          target_market_price_CE: trade?.targetMarketCE ,
+          target_market_price_PE: trade?.targetMarketPE ,
           step: parseFloat(spreadSize) ?? 0.25,
           profit_percent: parseFloat(rtpValue) ?? 0.5,
           total_amount: parseFloat(user?.funds),
@@ -512,11 +512,11 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
         console.log("📤 Sending WebSocket message:", message);
 
         try {
-          socketRef.current.send(JSON.stringify(message));
-          sentMessageMapRef.current.push({ token: user.token, id: user.id });
+          // socketRef.current.send(JSON.stringify(message));
+          // sentMessageMapRef.current.push({ token: user.token, id: user.id });
         } catch (err) {
           console.error("❌ Failed to send WebSocket message:", err);
-          updateFundsStatus(user.id, "Failed");
+          // updateFundsStatus(user.id, "Failed");
         }
       });
     } else {

@@ -30,7 +30,7 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
   ]);
   // useEffect(() => {
   //   if (data.length === 0) return; 
-    
+
   //   const interval = setInterval(() => {
   //     handleGetToken();
   //   }, 60000);
@@ -67,7 +67,7 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
   // ]);
   const { ceData, peData } = useZerodhaWebSocket();
   console.log(ceData, peData, "ceDatapeData");
-  
+
   useEffect(() => {
     if (!ceData && !peData) return;
 
@@ -147,21 +147,18 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
               res.option_type === (item.type === "CALL" ? "CE" : "PE") &&
               res.strike === parseFloat(item.strikePrice)
           );
-
+          const tradingsymbolDataCE = result.results.find((res)=>res.option_type === 'CE');
+          const tradingsymbolDataPE = result.results.find((res)=>res.option_type === 'PE');
+          console.log(tradingsymbolDataCE,"tradingsymbolDataCE");
+          
           if (matched) {
             countLtp(matched.instrument_key, item.type);
 
             return {
               ...item,
               instrument_key: matched.instrument_key,
-              trading_symbol:
-                matched.tradingsymbol.endsWith("CE")
-                  ? matched.tradingsymbol
-                  : item?.trading_symbol, // keep CE if already set
-              trading_symbol_2:
-                matched.tradingsymbol.endsWith("PE")
-                  ? matched.tradingsymbol
-                  : item.trading_symbol_2, // keep PE if already set
+              trading_symbol:tradingsymbolDataCE.tradingsymbol,
+              trading_symbol_2:tradingsymbolDataPE.tradingsymbol
             };
           }
 
@@ -264,7 +261,7 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
 
   return (
     <>
-    <ToastContainer />
+      <ToastContainer />
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
         <div className="overflow-y-auto h-full">
           <table className="min-w-full text-sm text-left">
@@ -372,13 +369,21 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
                         className="w-24 px-2 py-1 border rounded"
                         value={row.type === "CALL" ? row.targetMarketCE : row.targetMarketPE}
                         onChange={(e) => {
-                          const updated = [...data];
                           if (row.type === "CALL") {
-                            updated[index].targetMarketCE = Number(e.target.value);
+                            const updated = data.map((item) => ({
+                              ...item,
+                              targetMarketCE: e.target.value,
+                            }));
+
+                            setData(updated);
                           } else {
-                            updated[index].targetMarketPE = Number(e.target.value);
+                            const updated = data.map((item) => ({
+                              ...item,
+                              targetMarketPE: e.target.value,
+                            }));
+
+                            setData(updated);
                           }
-                          setData(updated);
                         }}
                       />
                     ) : (
