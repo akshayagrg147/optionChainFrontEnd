@@ -66,11 +66,11 @@ const ZerodhaSidebar = () => {
           api_key: f.api_key
         }));
         console.log(fundsData, "res.data");
-        
+
         localStorage.setItem('zerodha-funds', JSON.stringify(fundsData));
         const getData = JSON.parse(localStorage.getItem('zerodha-funds'));
         console.log(getData, "getData");
-        
+
       }
 
       const openState = {};
@@ -94,7 +94,7 @@ const ZerodhaSidebar = () => {
 
 
   useEffect(() => {
-    const updatedFunds = accounts.map(({ id, name, token, lotSize, invest_amount, sandbox_token, status, percentage, funds, investable_amount, call_lot, put_lot,zerodha_token ,api_key }) => ({
+    const updatedFunds = accounts.map(({ id, name, token, lotSize, invest_amount, sandbox_token, status, percentage, funds, investable_amount, call_lot, put_lot, zerodha_token, api_key }) => ({
       id,
       name,
       token,
@@ -110,8 +110,8 @@ const ZerodhaSidebar = () => {
       zerodha_token,
       api_key
     }));
-    console.log(updatedFunds,"updatedFunds");
-    
+    console.log(updatedFunds, "updatedFunds");
+
     localStorage.setItem("zerodha-funds", JSON.stringify(updatedFunds));
   }, [accounts]);
 
@@ -290,23 +290,26 @@ const ZerodhaSidebar = () => {
     setAccordionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const confirmAction = () => {
-    if (modalType === "apply") {
-      setAccounts((prev) =>
-        prev.map((acc) => ({
-          ...acc,
-          percentage: applyValue
-        }))
-      );
-    } else if (modalType === "reset") {
-      setApplyValue("");
-      setAccounts((prev) =>
-        prev.map((acc) => ({ ...acc, percentage: "" }))
-      );
-    }
-    setShowModal(false);
-    setModalType(null);
-  };
+const confirmAction = () => {
+  if (modalType === "apply") {
+    const safeValue = normalizePercentage(applyValue);
+
+    setAccounts((prev) =>
+      prev.map((acc) => ({
+        ...acc,
+        percentage: safeValue
+      }))
+    );
+  } else if (modalType === "reset") {
+    setApplyValue("");
+    setAccounts((prev) =>
+      prev.map((acc) => ({ ...acc, percentage: "" }))
+    );
+  }
+  setShowModal(false);
+  setModalType(null);
+};
+
 
   const saveAllChanges = async () => {
     for (const acc of accounts) {
@@ -318,7 +321,7 @@ const ZerodhaSidebar = () => {
         },
         body: JSON.stringify({
           invest_amount: acc.invest_amount,
-          percentage: acc.percentage,
+          percentage: normalizePercentage(acc.percentage),
           call_lot: acc.call_lot,
           put_lot: acc.put_lot
         })
@@ -341,7 +344,13 @@ const ZerodhaSidebar = () => {
     XLSX.writeFile(workbook, "funds_export.xlsx");
   };
 
+  const MAX_PERCENTAGE = 95;
 
+  const normalizePercentage = (value) => {
+    const num = Number(value);
+    if (isNaN(num)) return "";
+    return Math.min(Math.max(num, 0), MAX_PERCENTAGE);
+  };
 
   return (
     <>
@@ -447,11 +456,19 @@ const ZerodhaSidebar = () => {
                 <div className="mb-4">
                   <label className="text-xs block mb-1">Percentage</label>
                   <input
-                    type="text"
+                    type="number"
+                    min={0}
+                    max={95}
                     value={acc.percentage}
-                    onChange={(e) => handleInputChange(acc.id, "percentage", e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange(
+                        acc.id,
+                        "percentage",
+                        normalizePercentage(e.target.value)
+                      )
+                    }
                     className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
-                    placeholder="Enter 0-100"
+                    placeholder="Enter 0-95"
                   />
                 </div>
 
