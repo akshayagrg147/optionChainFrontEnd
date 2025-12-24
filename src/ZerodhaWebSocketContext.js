@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 
 const WebSocketContext = createContext();
 
-export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue, spreadSize, setReverseData, setReverseTradeDataTransfer }) => {
+export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue, spreadSize, setReverseData, setReverseTradeDataTransfer, isSimulation }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -543,12 +543,13 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
         step: parseFloat(spreadSize) ?? 0.25,
         profit_percent: parseFloat(rtpValue) ?? 0.5,
         total_amount: parseFloat(user?.funds),
-        quantityCE: user?.call_quantity,
-        quantityPE: user?.put_quantity,
+        quantityCE: 75,
+        quantityPE: 75,
         investable_amount: parseFloat(user?.investable_amount),
         api_key: user?.api_key ?? "",
         lot: parseInt(user.call_lot),
         reverseTrade: reverseTrade ? "ON" : "OFF",
+        is_simulation: isSimulation ? true : false,
       });
 
       sentMessageMapRef.current.push({
@@ -557,7 +558,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
       });
     });
 
-  
+
 
     console.log("📤 Sending WebSocket BULK message:", payloadArray);
 
@@ -572,6 +573,11 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
     // reset last sent when reverseTrade changes
     lastSentTradesRef.current = [];
   }, [reverseTrade]);
+
+  useEffect(() => {
+    // reset last sent when isSimulation changes
+    lastSentTradesRef.current = [];
+  }, [isSimulation]);
 
   // const sendActiveTradeMessages = () => {
   //   if (!isSocketReady || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
@@ -661,7 +667,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
     sendTimeout.current = setTimeout(() => {
       sendActiveTradeMessages();
     }, 10); // debounce delay
-  }, [tradeData, isSocketReady, reverseTrade]);
+  }, [tradeData, isSocketReady, reverseTrade, isSimulation]);
   const updateFundsStatus = (id, newStatus) => {
     const funds = JSON.parse(localStorage.getItem("zerodha-funds"));
     const updatedFunds = funds.map((fund) =>

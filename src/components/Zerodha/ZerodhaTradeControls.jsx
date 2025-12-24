@@ -7,7 +7,7 @@ import { useZerodhaWebSocket } from "../../ZerodhaWebSocketContext";
 import { toast, ToastContainer } from "react-toastify";
 
 
-const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade, spreadSize, setSpreadSize }) => {
+const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade, spreadSize, setSpreadSize, isSimulation, setIsSimulation }) => {
 
   useEffect(() => {
     if (data.length === 0) return;
@@ -147,18 +147,18 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
               res.option_type === (item.type === "CALL" ? "CE" : "PE") &&
               res.strike === parseFloat(item.strikePrice)
           );
-          const tradingsymbolDataCE = result.results.find((res)=>res.option_type === 'CE');
-          const tradingsymbolDataPE = result.results.find((res)=>res.option_type === 'PE');
-          console.log(tradingsymbolDataCE,"tradingsymbolDataCE");
-          
+          const tradingsymbolDataCE = result.results.find((res) => res.option_type === 'CE');
+          const tradingsymbolDataPE = result.results.find((res) => res.option_type === 'PE');
+          console.log(tradingsymbolDataCE, "tradingsymbolDataCE");
+
           if (matched) {
             countLtp(matched.instrument_key, item.type);
 
             return {
               ...item,
               instrument_key: matched.instrument_key,
-              trading_symbol:tradingsymbolDataCE.tradingsymbol,
-              trading_symbol_2:tradingsymbolDataPE.tradingsymbol
+              trading_symbol: tradingsymbolDataCE?.tradingsymbol || item?.trading_symbol,
+              trading_symbol_2: tradingsymbolDataPE?.tradingsymbol || item?.trading_symbol_2
             };
           }
 
@@ -282,7 +282,7 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
                 <th className="px-4 py-2">Active</th>
                 <th className="px-4 py-2 text-center">Action</th>
               </tr>
-            </thead>   <tbody className="text-gray-800">
+            </thead><tbody className="text-gray-800">
               {data.map((row, index) => (
                 <tr key={index} className="border-t">
                   <td className="px-4 py-2">{row.type}</td>
@@ -539,6 +539,18 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
           >
             <div
               className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${reverseTrade ? 'left-[1.50rem]' : 'left-1'}`}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Simulation</label>
+          <div
+            onClick={() => setIsSimulation(!isSimulation)}
+            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${isSimulation ? 'bg-blue-500' : 'bg-gray-300'}`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${isSimulation ? 'left-[1.50rem]' : 'left-1'}`}
             />
           </div>
         </div>

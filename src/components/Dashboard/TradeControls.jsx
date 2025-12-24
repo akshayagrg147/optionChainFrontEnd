@@ -29,7 +29,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   ]);
   // useEffect(() => {
   //   if (data.length === 0) return; 
-    
+
   //   const interval = setInterval(() => {
   //     handleGetToken();
   //   }, 60000);
@@ -258,9 +258,11 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
     console.log('Updated funds saved with LTP calculation.');
   }
 
+
+
   return (
     <>
-    <ToastContainer />
+      <ToastContainer />
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
         <div className="overflow-y-auto h-full">
           <table className="min-w-full text-sm text-left">
@@ -281,7 +283,7 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
                 <th className="px-4 py-2">Active</th>
                 <th className="px-4 py-2 text-center">Action</th>
               </tr>
-            </thead>   <tbody className="text-gray-800">
+            </thead><tbody className="text-gray-800">
               {data.map((row, index) => (
                 <tr key={index} className="border-t">
                   <td className="px-4 py-2">{row.type}</td>

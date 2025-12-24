@@ -55,6 +55,7 @@ const ZerodhaDashboard = () => {
     const [rtpValue, setRtpValue] = useState(0.25);
     const [spreadSize, setSpreadSize] = useState(0.5);
     const [reverseTradeDataTransfer,setReverseTradeDataTransfer] = useState(false);
+    const [isSimulation, setIsSimulation] = useState(false);
     const [data, setData] = useState(initialRows);
     const [reverseData, setReverseData] = useState(initialRows.map((r) => ({ ...r }))); // 🔁 clone for reverse trade
 
@@ -76,6 +77,7 @@ const ZerodhaDashboard = () => {
                             setReverseData={setReverseData}
                             reverseTradeDataTransfer={reverseTradeDataTransfer}
                             setReverseTradeDataTransfer={setReverseTradeDataTransfer}
+                            isSimulation={isSimulation}
                         >
 
                             <ZerodhaTradeTable
@@ -87,6 +89,8 @@ const ZerodhaDashboard = () => {
                                 setRtpValue={setRtpValue}
                                 spreadSize={spreadSize}
                                 setSpreadSize={setSpreadSize}
+                                isSimulation={isSimulation}
+                                setIsSimulation={setIsSimulation}
                             />
                             {reverseTrade &&
                                 <ZerodhaTradeTableSecond data={reverseData} setData={setReverseData} />}
