@@ -226,7 +226,7 @@
 //         </div>
 //       </div>
 
-     
+
 //     </>
 //   );
 // };
@@ -240,7 +240,7 @@ import axios from "axios";
 import { useZerodhaWebSocket } from "../../ZerodhaWebSocketContext";
 
 
-const ZerodhaTradeTableSecond = ({ data, setData,setRtpValue }) => {
+const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
 
 
 
@@ -264,7 +264,7 @@ const ZerodhaTradeTableSecond = ({ data, setData,setRtpValue }) => {
     );
   }, [ceData, peData]);
 
- 
+
   return (
     <>
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
@@ -281,7 +281,7 @@ const ZerodhaTradeTableSecond = ({ data, setData,setRtpValue }) => {
                 <th className="px-4 py-2">Lot Size</th>
                 {/* <th className="px-4 py-2">LTP Locked</th> */}
                 <th className="px-4 py-2">Status</th>
-                {/* <th className="px-4 py-2">P/L %</th> */}
+                <th className="px-4 py-2">P/L %</th>
                 {/* <th className="px-4 py-2">Buy In LTP</th> */}
                 <th className="px-4 py-2">Live LTP</th>
                 <th className="px-4 py-2">Active</th>
@@ -400,7 +400,7 @@ const ZerodhaTradeTableSecond = ({ data, setData,setRtpValue }) => {
                       row.status
                     )}
                   </td>
-                  {/* <td className="px-4 py-2">{row.pl}</td> */}
+                  <td className="px-4 py-2">{row.pl}</td>
                   {/* <td className="px-4 py-2">{row.buyInLTP}</td> */}
                   <td className="px-4 py-2 text-green-500">{row.liveInLTP}</td>
                   <td className="px-4 py-2">
@@ -443,7 +443,7 @@ const ZerodhaTradeTableSecond = ({ data, setData,setRtpValue }) => {
         </div>
       </div>
 
-      
+
     </>
   );
 };

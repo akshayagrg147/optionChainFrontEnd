@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 
 const WebSocketContext = createContext();
 
-export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue, spreadSize, setReverseData, setReverseTradeDataTransfer, isSimulation }) => {
+export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, setRtpValue, setReverseTrade, reverseTrade, rtpValue, spreadSize, setReverseData, reverseTradeDataTransfer, setReverseTradeDataTransfer, isSimulation, setMainData }) => {
   const socketRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const sendTimeout = useRef(null);
@@ -12,6 +13,12 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
   const lastSentTradesRef = useRef([]); // for checking duplicates
   const sentMessageMapRef = useRef([]); // [{ token, id }]
   const tradeDataRef = useRef(tradeData);
+  const reverseTradeDataTransferRef = useRef(reverseTradeDataTransfer);
+
+  // keep ref in sync with state
+  useEffect(() => {
+    reverseTradeDataTransferRef.current = reverseTradeDataTransfer;
+  }, [reverseTradeDataTransfer]);
 
   // keep ref in sync with state 
   useEffect(() => {
@@ -148,6 +155,16 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
         if (data.error) {
           console.warn("❌ WebSocket Error Message:", data.error);
 
+          if (data.error === "No valid users to process") {
+            toast.error(data.error);
+            setTradeData((prev) =>
+              prev.map((item) => ({
+                ...item,
+                active: false,
+              }))
+            );
+          }
+
           const tokenMatch = data.error.match(/access_token=([A-Za-z0-9._-]+)/);
           const matchedToken = tokenMatch ? tokenMatch[1] : null;
 
@@ -164,6 +181,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
         }
 
         // ✅ Handle success scenario
+        // ✅ Handle success scenario
         if (data.message == "Order placed successfully...Waiting for square off") {
           setTradeData((prev) =>
             prev.map((item) =>
@@ -172,72 +190,104 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
                   ...item,
                   status: "Waiting for Square-Off",
                   buyInLTP: data?.BUY_LTP,
-                  pl: data?.pnl_percentage
+                  pl: 0 // Initial PnL is 0
                 }
                 : item
             )
           );
         }
 
-        if (data?.locked_LTP) {
+        // Handle Trailing SL Initialization
+        if (data.init_SL) {
           setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
-              ltpLocked: data?.locked_LTP,
+              ltpLocked: data?.locked_LTP ?? data?.locked_ltp,
             }))
           );
         }
 
-        if (data.message === "Token sell") {
+        // Handle Live P&L and SL Updates
+        if (data.pnl_update) {
           setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
-              pl: data?.pnl_percentage
+              pl: data?.pnl_percent,
+              ltpLocked: data?.locked_ltp ?? data?.locked_LTP ?? item.ltpLocked,
+              // Optionally update current LTP if you track it in tradeData
             }))
-
           );
         }
+
+        // Fallback for just locked_LTP update if not covered by pnl_update (legacy or specific message)
+        if (data?.locked_LTP || data?.locked_ltp) {
+          setTradeData((prev) =>
+            prev.map((item) => ({
+              ...item,
+              ltpLocked: data?.locked_LTP ?? data?.locked_ltp,
+            }))
+          );
+        }
+
+        // Removed "Token sell" block as it's not sent by backend
 
         if (data.message === "Reverse Order placed successfully...Waiting for square off") {
-          console.log(data?.market_value, "data?.market_value");
+          console.log("Reverse trade started");
           setReverseTradeDataTransfer(true)
-          setRtpValue(data?.market_value)
+          // setRtpValue(data?.market_value) // Backend does not send market_value here
           setReverseData(prev =>
             prev.map(item => ({
               ...item,
               status: "Waiting for Square-Off",
               buyInLTP: data?.BUY_LTP,
-              ltpLocked: data?.locked_LTP ?? item.ltpLocked,
-              pl: data?.pnl_percent ?? item.pl
+              // Backend doesn't send locked_LTP or pl here initially
+              ltpLocked: 0,
+              pl: 0
             }))
           );
         }
         console.log(reverseTrade, "reverseTrade");
 
-        // if (!reverseTrade) {
         if (data.message === "SELL Order placed successfully") {
-          setReverseTradeDataTransfer(false)
-          setTradeData((prev) =>
-            prev.map((item) =>
-              item.status === "Waiting for Square-Off"
-                ? {
-                  ...item,
-                  status: "Orders Selled",
-                  buyInLTP: data?.SELL_LTP,
-                  pl: data?.pnl_percentage
-                }
-                : item
-            )
-          );
-          setReverseData(prev =>
-            prev.map(item => ({
-              ...item,
-              status: "Sell Orders",
-              buyInLTP: data?.SELL_LTP,
-              ltpLocked: data?.locked_LTP ?? item.ltpLocked,
-              pl: data?.pnl_percentage
-            }))
-          );
+          // Use Ref to get current value inside closure
+          const isReverseMode = reverseTradeDataTransferRef.current;
+          console.log("🔍 SELL Message Received. isReverseMode (Ref):", isReverseMode);
+          console.log("🔍 Payload:", data);
+
+          if (isReverseMode) {
+            console.log("✅ Routing to Reverse Data");
+            // Reverse Trade SELL -> Update Reverse Table ONLY
+            setReverseTradeDataTransfer(false); // Turn off reverse mode
+            reverseTradeDataTransferRef.current = false; // ⚡ UPDATE REF IMMEDIATELY TO PREVENT RACE CONDITION
+
+            setReverseData((prev) => {
+              console.log("📝 Updating Reverse Data with:", data.pnl_percentage);
+              return prev.map((item) => ({
+                ...item,
+                status: "Orders Selled",
+                buyInLTP: data?.SELL_LTP,
+                pl: data?.pnl_percentage,
+              }));
+            });
+          } else {
+            console.log("✅ Routing to Main Data");
+            // Main Trade SELL -> Update Main Table ONLY
+            // ⚡ USE EXPLICIT MAIN SETTER if available, else fall back to current tradeData setter
+            const updateMain = setMainData || setTradeData;
+
+            updateMain((prev) =>
+              prev.map((item) =>
+                item.status === "Waiting for Square-Off"
+                  ? {
+                    ...item,
+                    status: "Orders Selled",
+                    buyInLTP: data?.SELL_LTP,
+                    pl: data?.pnl_percentage,
+                  }
+                  : item
+              )
+            );
+          }
           // ✅ Close socket & stop reconnect
           // if (socketRef.current) {
           //   socketRef.current.close();
@@ -249,8 +299,19 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           // }
           // setIsSocketReady(false);
         }
-        // }
         if (data.message == "Trading completed - No reverse trade") {
+          // Optional: Update status to 'Completed' or similar if needed
+          setTradeData((prev) =>
+            prev.map((item) =>
+              item.status === "Waiting for Square-Off"
+                ? {
+                  ...item,
+                  status: "Completed",
+                }
+                : item
+            )
+          );
+
           if (socketRef.current) socketRef.current.close();
           socket.onclose = (event) => {
             console.warn(`🔌 WebSocket closed (code: ${event.code}). Reconnecting...`);
@@ -652,6 +713,11 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
   useEffect(() => {
     if (!isSocketReady) return;
 
+    // ✅ Reset sent history if no trades are active
+    if (!tradeData.some((t) => t.active)) {
+      lastSentTradesRef.current = [];
+    }
+
     const hasActive = tradeData.some((t) => t.active && t.status === "Inactive");
     if (hasActive) {
       setTradeData((prev) =>
@@ -678,6 +744,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
     localStorage.setItem("zerodha-funds", JSON.stringify(updatedFunds));
     // This will trigger `storage` event in other tabs
   };
+
   return (
     <WebSocketContext.Provider value={{ ceData, peData }}>
       {children}

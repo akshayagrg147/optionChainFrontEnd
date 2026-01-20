@@ -7,6 +7,7 @@ import ZerodhaTopbar from "../../components/Zerodha/ZerodhaTopBar";
 import ZerodhaTradeTable from "../../components/Zerodha/ZerodhaTradeControls";
 import ZerodhaTradeTableSecond from "../../components/Zerodha/ZerodhaTradeControlSecond";
 import ZerodhaMarketTable from "../../components/Zerodha/ZerodhaMarketTable";
+import ZerodhaManualTrade from "../../components/Zerodha/ZerodhaManualTrade";
 
 const initialRows = [
     {
@@ -54,21 +55,22 @@ const ZerodhaDashboard = () => {
     const [reverseTrade, setReverseTrade] = useState(false);
     const [rtpValue, setRtpValue] = useState(0.25);
     const [spreadSize, setSpreadSize] = useState(0.5);
-    const [reverseTradeDataTransfer,setReverseTradeDataTransfer] = useState(false);
+    const [reverseTradeDataTransfer, setReverseTradeDataTransfer] = useState(false);
     const [isSimulation, setIsSimulation] = useState(false);
     const [data, setData] = useState(initialRows);
     const [reverseData, setReverseData] = useState(initialRows.map((r) => ({ ...r }))); // 🔁 clone for reverse trade
+    const [showManualTrade, setShowManualTrade] = useState(false);
 
     return (
         <div className="flex h-screen bg-gray-100">
             <ZerodhaSidebar />
             <div className="flex-1 flex flex-col">
-                <ZerodhaTopbar />
+                <ZerodhaTopbar onManualTradeClick={() => setShowManualTrade(!showManualTrade)} />
                 <div className="p-4 gap-4">
                     <div className="space-y-4">
                         <ZerodhaWebSocketProvider
                             tradeData={data} // 🔁 switch which array goes to socket
-                            setTradeData={reverseTradeDataTransfer ?  setReverseData  : setData}
+                            setTradeData={reverseTradeDataTransfer ? setReverseData : setData}
                             reverseTrade={reverseTrade}
                             setReverseTrade={setReverseTrade}
                             setRtpValue={setRtpValue}
@@ -78,28 +80,36 @@ const ZerodhaDashboard = () => {
                             reverseTradeDataTransfer={reverseTradeDataTransfer}
                             setReverseTradeDataTransfer={setReverseTradeDataTransfer}
                             isSimulation={isSimulation}
+                            setMainData={setData}
                         >
 
-                            <ZerodhaTradeTable
-                                data={data}
-                                setData={setData}
-                                setReverseTrade={setReverseTrade}
-                                reverseTrade={reverseTrade}
-                                rtpValue={rtpValue}
-                                setRtpValue={setRtpValue}
-                                spreadSize={spreadSize}
-                                setSpreadSize={setSpreadSize}
-                                isSimulation={isSimulation}
-                                setIsSimulation={setIsSimulation}
-                            />
-                            {reverseTrade &&
-                                <ZerodhaTradeTableSecond data={reverseData} setData={setReverseData} />}
+                            {/* Manual Trade Section */}
+                            {showManualTrade ? (
+                                <ZerodhaManualTrade />
+                            ) : (
+                                <>
+                                    <ZerodhaTradeTable
+                                        data={data}
+                                        setData={setData}
+                                        setReverseTrade={setReverseTrade}
+                                        reverseTrade={reverseTrade}
+                                        rtpValue={rtpValue}
+                                        setRtpValue={setRtpValue}
+                                        spreadSize={spreadSize}
+                                        setSpreadSize={setSpreadSize}
+                                        isSimulation={isSimulation}
+                                        setIsSimulation={setIsSimulation}
+                                    />
+                                    {reverseTrade &&
+                                        <ZerodhaTradeTableSecond data={reverseData} setData={setReverseData} />}
 
 
-                            <ZerodhaMarketTable
-                                data={reverseTrade ? reverseData : data}
-                                setData={reverseTrade ? setReverseData : setData}
-                            />
+                                    <ZerodhaMarketTable
+                                        data={reverseTrade ? reverseData : data}
+                                        setData={reverseTrade ? setReverseData : setData}
+                                    />
+                                </>
+                            )}
                         </ZerodhaWebSocketProvider>
                     </div>
                 </div>

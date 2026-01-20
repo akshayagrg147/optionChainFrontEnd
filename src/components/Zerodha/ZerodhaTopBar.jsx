@@ -4,7 +4,7 @@ import NotificationPanel from "../../Common/Notification";
 import { FaBell } from "react-icons/fa";
 import axios from "axios";
 
-const ZerodhaTopbar = () => {
+const ZerodhaTopbar = ({ onManualTradeClick }) => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [active, setActive] = useState("live");
   const [uploading, setUploading] = useState(false);
@@ -136,11 +136,13 @@ const ZerodhaTopbar = () => {
           Simulation
         </button>
 
-        <Link to={"/manual-trade"}>
-          <button className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 text-sm">
-            Manual Trade Setup
-          </button>
-        </Link>
+
+        <button
+          onClick={onManualTradeClick}
+          className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400 text-sm"
+        >
+          Manual Trade Setup
+        </button>
         {/*<Link to={"/manual-trade"}> */}
         <button onClick={() => downloadLog()} className="bg-red-500 text-white px-4 py-1 rounded hover:bg-gray-400 text-sm">
           Download Logs
@@ -164,7 +166,7 @@ const ZerodhaTopbar = () => {
           className="hidden"
         />
       </div>
-      <button onClick={()=>navigate('/')} className="bg-purple-500 text-white px-4 py-1 rounded hover:bg-gray-400 text-sm">
+      <button onClick={() => navigate('/')} className="bg-purple-500 text-white px-4 py-1 rounded hover:bg-gray-400 text-sm">
         Upstox
       </button>
       {/* Right Side Buttons */}
