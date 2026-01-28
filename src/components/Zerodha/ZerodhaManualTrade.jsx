@@ -36,10 +36,28 @@ const ZerodhaManualTrade = () => {
     // WebSocket state
     const [wsStatus, setWsStatus] = useState('disconnected'); // disconnected, connecting, connected, reconnecting
     const [orderResults, setOrderResults] = useState([]); // Track order results
+    
+    // Keyboard shortcuts state
+    const [pressedKeys, setPressedKeys] = useState({
+        ctrl: false,
+        b: false,
+        s: false
+    });
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptsRef = useRef(0);
     const pendingOrdersRef = useRef(new Map()); // Track pending orders by account ID
+    const handleWebSocketMessageRef = useRef(null); // Ref to always have latest handler
+    const handleLiveLTPUpdateRef = useRef(null); // Ref to always have latest LTP handler
+    
+    // Live market data state
+    const [liveMarketData, setLiveMarketData] = useState({
+        CE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
+        PE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
+        _lastUpdate: Date.now() // Force React to detect changes
+    });
+    const ceSymbolRef = useRef(null);
+    const peSymbolRef = useRef(null);
 
     // Construct WebSocket URL from base URL
     const getWebSocketUrl = () => {
@@ -72,12 +90,176 @@ const ZerodhaManualTrade = () => {
         }
     }, []);
 
+    // Debug: Log state changes
+    useEffect(() => {
+        console.log("🔄 liveMarketData state updated:", liveMarketData);
+    }, [liveMarketData]);
+
+    // Debounce timer ref for symbol resolution
+    const resolveSymbolTimeoutRef = useRef(null);
+    // Track last resolved values to prevent duplicate calls
+    const lastResolvedRef = useRef({ instrument: '', expiry: '', strike: '', option_type: '' });
+
+    // Define subscribeToMarketData first (used by resolveTradingSymbol)
+    const subscribeToMarketData = useCallback(async (currentSymbol, instrumentOverride = null, expiryOverride = null, strikeOverride = null) => {
+        if (!accounts.length || wsRef.current?.readyState !== WebSocket.OPEN) {
+            console.warn("⚠️ Cannot subscribe to market data: accounts or WebSocket not ready");
+            return;
+        }
+
+        try {
+            const account = accounts[0];
+            const instrument = instrumentOverride || (symbolData.instrument === 'Nifty Bank' ? 'BANKNIFTY' : symbolData.instrument);
+            const expiry = expiryOverride || symbolData.expiry;
+            const strike = strikeOverride ? parseFloat(strikeOverride) : parseFloat(symbolData.strike);
+
+            // Get CE symbol
+            const cePayload = {
+                name: instrument,
+                expiry: expiry,
+                option_type: 'CE',
+                strike: strike
+            };
+            const ceResponse = await axios.post(`${process.env.REACT_APP_BASE_URL}api/get-tradingsymbol/`, cePayload);
+            const ceSymbol = ceResponse.data?.tradingsymbol;
+
+            // Get PE symbol
+            const pePayload = {
+                name: instrument,
+                expiry: expiry,
+                option_type: 'PE',
+                strike: strike
+            };
+            const peResponse = await axios.post(`${process.env.REACT_APP_BASE_URL}api/get-tradingsymbol/`, pePayload);
+            const peSymbol = peResponse.data?.tradingsymbol;
+
+            if (ceSymbol || peSymbol) {
+                ceSymbolRef.current = ceSymbol;
+                peSymbolRef.current = peSymbol;
+
+                // Send subscription message
+                const subscribeMessage = {
+                    type: 'subscribe_market_data',
+                    api_key: account.api_key,
+                    access_token: account.zerodha_token,
+                    ce_symbol: ceSymbol || null,
+                    pe_symbol: peSymbol || null
+                };
+
+                wsRef.current.send(JSON.stringify(subscribeMessage));
+                console.log("📡 Subscribed to market data:", subscribeMessage);
+            }
+        } catch (error) {
+            console.error("Error subscribing to market data:", error);
+        }
+    }, [accounts, symbolData.instrument, symbolData.expiry, symbolData.strike]);
+
+    // Define resolveTradingSymbol before useEffect that uses it
+    const resolveTradingSymbol = useCallback(async () => {
+        // Validate inputs before making API call
+        const instrument = symbolData.instrument;
+        const expiry = symbolData.expiry;
+        const strike = symbolData.strike;
+        const option_type = symbolData.option_type;
+        
+        if (!instrument || !expiry || !strike || !option_type) {
+            console.warn("⚠️ Cannot resolve symbol: missing required fields", { instrument, expiry, strike, option_type });
+            return;
+        }
+
+        try {
+            const payload = {
+                name: instrument === 'Nifty Bank' ? 'BANKNIFTY' : instrument,
+                expiry: expiry,
+                option_type: option_type,
+                strike: parseFloat(strike)
+            };
+
+            console.log("📡 Calling /api/get-tradingsymbol/ with payload:", payload);
+            const response = await axios.post(`${process.env.REACT_APP_BASE_URL}api/get-tradingsymbol/`, payload);
+            console.log("✅ Symbol resolution response:", response.data);
+
+            if (response.data && response.data.tradingsymbol) {
+                setResolvedSymbol(response.data.tradingsymbol);
+                
+                // Subscribe to market data for both CE and PE
+                // Use current symbolData values for subscription
+                subscribeToMarketData(response.data.tradingsymbol, instrument, expiry, strike);
+            } else {
+                console.warn("⚠️ No tradingsymbol in response:", response.data);
+                setResolvedSymbol('');
+            }
+        } catch (error) {
+            console.error("❌ Symbol resolution failed:", error);
+            if (error.response) {
+                console.error("Response data:", error.response.data);
+                console.error("Response status:", error.response.status);
+            }
+            setResolvedSymbol('');
+        }
+    }, [symbolData.instrument, symbolData.expiry, symbolData.strike, symbolData.option_type, subscribeToMarketData]);
+
     // Auto-resolve symbol when dependent fields change
     useEffect(() => {
-        if (symbolData.instrument && symbolData.expiry && symbolData.strike && symbolData.option_type) {
-            resolveTradingSymbol();
+        // Clear any pending timeout
+        if (resolveSymbolTimeoutRef.current) {
+            clearTimeout(resolveSymbolTimeoutRef.current);
+            resolveSymbolTimeoutRef.current = null;
         }
-    }, [symbolData.instrument, symbolData.expiry, symbolData.strike, symbolData.option_type]);
+
+        // Check if all required fields are present
+        const hasAllFields = symbolData.instrument && symbolData.expiry && symbolData.strike && symbolData.option_type;
+        
+        // Check if values actually changed
+        const valuesChanged = 
+            lastResolvedRef.current.instrument !== symbolData.instrument ||
+            lastResolvedRef.current.expiry !== symbolData.expiry ||
+            lastResolvedRef.current.strike !== symbolData.strike ||
+            lastResolvedRef.current.option_type !== symbolData.option_type;
+        
+        if (hasAllFields && valuesChanged) {
+            // Debounce the API call to avoid too many requests
+            console.log("🔄 Symbol data changed, scheduling resolution:", symbolData);
+            console.log("📊 Previous values:", lastResolvedRef.current);
+            
+            resolveSymbolTimeoutRef.current = setTimeout(() => {
+                // Double-check values haven't changed during debounce
+                const currentValues = {
+                    instrument: symbolData.instrument,
+                    expiry: symbolData.expiry,
+                    strike: symbolData.strike,
+                    option_type: symbolData.option_type
+                };
+                
+                // Update last resolved values
+                lastResolvedRef.current = { ...currentValues };
+                
+                console.log("📡 Calling resolveTradingSymbol with:", currentValues);
+                resolveTradingSymbol();
+            }, 300); // 300ms debounce
+        } else if (!hasAllFields) {
+            // Reset immediately if fields are incomplete
+            console.log("⚠️ Incomplete symbol data, resetting");
+            setResolvedSymbol('');
+            setLiveMarketData({
+                CE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
+                PE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
+                _lastUpdate: Date.now()
+            });
+            // Reset last resolved values
+            lastResolvedRef.current = { instrument: '', expiry: '', strike: '', option_type: '' };
+        } else {
+            console.log("ℹ️ Symbol data unchanged, skipping API call");
+        }
+
+        // Cleanup timeout on unmount or when dependencies change
+        return () => {
+            if (resolveSymbolTimeoutRef.current) {
+                clearTimeout(resolveSymbolTimeoutRef.current);
+                resolveSymbolTimeoutRef.current = null;
+            }
+        };
+    }, [symbolData.instrument, symbolData.expiry, symbolData.strike, symbolData.option_type, resolveTradingSymbol]);
 
     // WebSocket connection management
     const connectWebSocket = useCallback(() => {
@@ -116,7 +298,10 @@ const ZerodhaManualTrade = () => {
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    handleWebSocketMessage(data);
+                    // Use ref to always call the latest version of handleWebSocketMessage
+                    if (handleWebSocketMessageRef.current) {
+                        handleWebSocketMessageRef.current(data);
+                    }
                 } catch (error) {
                     console.error("❌ Error parsing WebSocket message:", error);
                 }
@@ -150,39 +335,121 @@ const ZerodhaManualTrade = () => {
         }
     }, [WS_URL]);
 
-    const handleWebSocketMessage = (data) => {
-        console.log("📩 WebSocket message received:", data);
-
-        switch (data.type) {
-            case 'connection':
-                if (data.status === 'connected') {
-                    toast.success("WebSocket connected successfully");
-                }
-                break;
-
-            case 'order_status':
-                if (data.status === 'processing') {
-                    toast.info(data.message || "Processing order...");
-                }
-                break;
-
-            case 'order_result':
-                handleOrderResult(data);
-                break;
-
-            case 'error':
-                toast.error(data.message || "An error occurred");
-                setLoading(false);
-                break;
-
-            case 'pong':
-                // Heartbeat response, no action needed
-                break;
-
-            default:
-                console.log("Unknown message type:", data.type);
+    const handleLiveLTPUpdate = useCallback((data) => {
+        console.log("🔄 handleLiveLTPUpdate called with:", data);
+        const { option_type, ltp, bought_at, quantity, pnl, pnl_percent } = data;
+        
+        if (!option_type || (option_type !== 'CE' && option_type !== 'PE')) {
+            console.warn("⚠️ Invalid option_type:", option_type);
+            return;
         }
-    };
+        
+        // Use functional update to ensure we have the latest state
+        setLiveMarketData(prev => {
+            // Get current values for the option type being updated
+            const currentData = prev[option_type] || {
+                ltp: null,
+                bought_at: null,
+                quantity: 0,
+                pnl: null,
+                pnl_percent: null
+            };
+            
+            // Create updated data - always use new values if provided, otherwise keep current
+            const updatedOptionData = {
+                ltp: (ltp !== null && ltp !== undefined) ? Number(ltp) : currentData.ltp,
+                bought_at: (bought_at !== null && bought_at !== undefined) ? Number(bought_at) : currentData.bought_at,
+                quantity: (quantity !== null && quantity !== undefined) ? Number(quantity) : currentData.quantity,
+                pnl: (pnl !== null && pnl !== undefined) ? Number(pnl) : currentData.pnl,
+                pnl_percent: (pnl_percent !== null && pnl_percent !== undefined) ? Number(pnl_percent) : currentData.pnl_percent
+            };
+            
+            // Always create a completely new state object with a new timestamp
+            const newState = {
+                CE: option_type === 'CE' ? updatedOptionData : { ...prev.CE },
+                PE: option_type === 'PE' ? updatedOptionData : { ...prev.PE },
+                _lastUpdate: Date.now() // Always change this to force React re-render
+            };
+            
+            console.log("📊 Updated market data state:", JSON.stringify(newState, null, 2));
+            console.log("📊 Previous state was:", JSON.stringify(prev, null, 2));
+            console.log("📊 Option type:", option_type, "LTP:", ltp);
+            console.log("📊 State changed:", JSON.stringify(newState) !== JSON.stringify(prev));
+            
+            return newState;
+        });
+    }, []);
+    
+    // Update ref whenever handleLiveLTPUpdate changes
+    useEffect(() => {
+        handleLiveLTPUpdateRef.current = handleLiveLTPUpdate;
+    }, [handleLiveLTPUpdate]);
+
+    // Update ref whenever handleWebSocketMessage changes
+    useEffect(() => {
+        handleWebSocketMessageRef.current = (data) => {
+            console.log("📩 WebSocket message received:", data);
+
+            switch (data.type) {
+                case 'connection':
+                    if (data.status === 'connected') {
+                        toast.success("WebSocket connected successfully");
+                    }
+                    break;
+
+                case 'order_status':
+                    if (data.status === 'processing') {
+                        toast.info(data.message || "Processing order...");
+                    }
+                    break;
+
+                case 'order_result':
+                    handleOrderResult(data);
+                    // Update bought_at when order is placed successfully
+                    if (data.status === 'success' && data.average_price) {
+                        const optionType = data.tradingsymbol?.includes('CE') ? 'CE' : 
+                                         data.tradingsymbol?.includes('PE') ? 'PE' : null;
+                        if (optionType && data.transaction_type === 'BUY') {
+                            setLiveMarketData(prev => ({
+                                ...prev,
+                                [optionType]: {
+                                    ...prev[optionType],
+                                    bought_at: data.average_price,
+                                    quantity: prev[optionType].quantity + (data.quantity || 0)
+                                }
+                            }));
+                        }
+                    }
+                    break;
+
+                case 'live_ltp':
+                    // Handle live LTP updates
+                    console.log("📈 Processing live_ltp message:", data);
+                    if (handleLiveLTPUpdateRef.current) {
+                        handleLiveLTPUpdateRef.current(data);
+                    } else {
+                        console.error("⚠️ handleLiveLTPUpdateRef.current is null!");
+                    }
+                    break;
+
+                case 'market_data_subscribed':
+                    toast.success(data.message || "Subscribed to market data");
+                    break;
+
+                case 'error':
+                    toast.error(data.message || "An error occurred");
+                    setLoading(false);
+                    break;
+
+                case 'pong':
+                    // Heartbeat response, no action needed
+                    break;
+
+                default:
+                    console.log("Unknown message type:", data.type);
+            }
+        };
+    }, [handleLiveLTPUpdate]);
 
     const handleOrderResult = (result) => {
         const { status, order_id, tradingsymbol, transaction_type, quantity, average_price, order_status, message, error } = result;
@@ -259,29 +526,8 @@ const ZerodhaManualTrade = () => {
         }));
     };
 
-    const resolveTradingSymbol = async () => {
-        try {
-            const payload = {
-                name: symbolData.instrument === 'Nifty Bank' ? 'BANKNIFTY' : symbolData.instrument,
-                expiry: symbolData.expiry,
-                option_type: symbolData.option_type,
-                strike: parseFloat(symbolData.strike)
-            };
 
-            const response = await axios.post(`${process.env.REACT_APP_BASE_URL}api/get-tradingsymbol/`, payload);
-
-            if (response.data && response.data.tradingsymbol) {
-                setResolvedSymbol(response.data.tradingsymbol);
-            } else {
-                setResolvedSymbol('');
-            }
-        } catch (error) {
-            console.error("Symbol resolution failed:", error);
-            setResolvedSymbol('');
-        }
-    };
-
-    const fetchLTP = async (symbol) => {
+    const fetchLTP = useCallback(async (symbol) => {
         if (!accounts.length) return null;
         const account = accounts[0];
         try {
@@ -302,10 +548,10 @@ const ZerodhaManualTrade = () => {
             return null;
         }
         return null;
-    };
+    }, [accounts, formData.exchange]);
 
     // Extracted order placement logic - reusable for both quick buttons and form submit
-    const placeOrderForTransactionType = async (transactionType) => {
+    const placeOrderForTransactionType = useCallback(async (transactionType) => {
         if (accounts.length === 0) {
             toast.error("No active accounts found.");
             return;
@@ -436,18 +682,79 @@ const ZerodhaManualTrade = () => {
             toast.error("Unexpected error placing orders.");
             setLoading(false);
         }
-    };
+    }, [accounts, resolvedSymbol, formData, symbolData, isSimulation, connectWebSocket, fetchLTP]);
 
     // Quick action handlers
-    const handleQuickBuy = async (e) => {
+    const handleQuickBuy = useCallback(async (e) => {
         e?.preventDefault();
+        if (loading || wsStatus !== 'connected' || !resolvedSymbol) {
+            return;
+        }
         await placeOrderForTransactionType('BUY');
-    };
+    }, [loading, wsStatus, resolvedSymbol, placeOrderForTransactionType]);
 
-    const handleQuickSell = async (e) => {
+    const handleQuickSell = useCallback(async (e) => {
         e?.preventDefault();
+        if (loading || wsStatus !== 'connected' || !resolvedSymbol) {
+            return;
+        }
         await placeOrderForTransactionType('SELL');
-    };
+    }, [loading, wsStatus, resolvedSymbol, placeOrderForTransactionType]);
+
+    // Keyboard shortcuts handler
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            const isCtrl = e.ctrlKey || e.metaKey; // Support both Ctrl (Windows/Linux) and Cmd (Mac)
+            
+            // Update pressed keys state
+            if (isCtrl) {
+                setPressedKeys(prev => ({ ...prev, ctrl: true }));
+            }
+            if (e.key.toLowerCase() === 'b') {
+                setPressedKeys(prev => ({ ...prev, b: true }));
+                if (isCtrl) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("⌨️ Ctrl+B pressed - Quick Buy");
+                    handleQuickBuy();
+                }
+            }
+            if (e.key.toLowerCase() === 's') {
+                setPressedKeys(prev => ({ ...prev, s: true }));
+                if (isCtrl) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("⌨️ Ctrl+S pressed - Quick Sell");
+                    handleQuickSell();
+                }
+            }
+        };
+
+        const handleKeyUp = (e) => {
+            const isCtrl = e.ctrlKey || e.metaKey;
+            
+            // Update pressed keys state
+            if (!isCtrl) {
+                setPressedKeys(prev => ({ ...prev, ctrl: false }));
+            }
+            if (e.key.toLowerCase() === 'b') {
+                setPressedKeys(prev => ({ ...prev, b: false }));
+            }
+            if (e.key.toLowerCase() === 's') {
+                setPressedKeys(prev => ({ ...prev, s: false }));
+            }
+        };
+
+        // Add event listeners
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [handleQuickBuy, handleQuickSell]);
 
     // Form submit handler (uses current formData.transaction_type)
     const handlePlaceOrder = async (e) => {
@@ -588,31 +895,80 @@ const ZerodhaManualTrade = () => {
                                 </div>
                                 
                                 {/* Quick Action Buttons */}
-                                <div className="flex gap-3 w-full md:w-auto">
-                                    <button
-                                        type="button"
-                                        onClick={handleQuickBuy}
-                                        disabled={loading || wsStatus !== 'connected'}
-                                        className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg ${
-                                            loading || wsStatus !== 'connected'
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300 active:scale-95'
-                                        }`}
-                                    >
-                                        {loading ? '⏳' : '🔼'} QUICK BUY
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleQuickSell}
-                                        disabled={loading || wsStatus !== 'connected'}
-                                        className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg ${
-                                            loading || wsStatus !== 'connected'
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300 active:scale-95'
-                                        }`}
-                                    >
-                                        {loading ? '⏳' : '🔽'} QUICK SELL
-                                    </button>
+                                <div className="flex flex-col gap-3 w-full md:w-auto">
+                                    <div className="flex gap-3 w-full md:w-auto">
+                                        <button
+                                            type="button"
+                                            onClick={handleQuickBuy}
+                                            disabled={loading || wsStatus !== 'connected' || !resolvedSymbol}
+                                            className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${
+                                                loading || wsStatus !== 'connected' || !resolvedSymbol
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : pressedKeys.ctrl && pressedKeys.b
+                                                        ? 'bg-blue-800 ring-4 ring-blue-300 scale-105'
+                                                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300 active:scale-95'
+                                            }`}
+                                        >
+                                            {loading ? '⏳' : '🔼'} QUICK BUY
+                                            {(pressedKeys.ctrl && pressedKeys.b) && (
+                                                <span className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleQuickSell}
+                                            disabled={loading || wsStatus !== 'connected' || !resolvedSymbol}
+                                            className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${
+                                                loading || wsStatus !== 'connected' || !resolvedSymbol
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : pressedKeys.ctrl && pressedKeys.s
+                                                        ? 'bg-red-700 ring-4 ring-red-300 scale-105'
+                                                        : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300 active:scale-95'
+                                            }`}
+                                        >
+                                            {loading ? '⏳' : '🔽'} QUICK SELL
+                                            {(pressedKeys.ctrl && pressedKeys.s) && (
+                                                <span className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </button>
+                                    </div>
+                                    {/* Keyboard Shortcuts Indicator */}
+                                    <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                                        <span className="font-semibold">Shortcuts:</span>
+                                        <div className="flex items-center gap-1">
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
+                                                pressedKeys.ctrl ? 'bg-yellow-300 ring-2 ring-yellow-400' : ''
+                                            }`}>
+                                                {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
+                                            </kbd>
+                                            <span>+</span>
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
+                                                pressedKeys.b ? 'bg-blue-300 ring-2 ring-blue-400' : ''
+                                            }`}>
+                                                B
+                                            </kbd>
+                                            <span className="text-blue-600 font-semibold">Buy</span>
+                                        </div>
+                                        <span className="mx-1">|</span>
+                                        <div className="flex items-center gap-1">
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
+                                                pressedKeys.ctrl ? 'bg-yellow-300 ring-2 ring-yellow-400' : ''
+                                            }`}>
+                                                {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
+                                            </kbd>
+                                            <span>+</span>
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
+                                                pressedKeys.s ? 'bg-red-300 ring-2 ring-red-400' : ''
+                                            }`}>
+                                                S
+                                            </kbd>
+                                            <span className="text-red-600 font-semibold">Sell</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -622,6 +978,122 @@ const ZerodhaManualTrade = () => {
                         )}
                     </div>
                 </div>
+
+                {/* --- Live Market Data Display --- */}
+                {((liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) || 
+                  (liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined)) && (
+                    <div className="col-span-1 md:col-span-2">
+                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <span className="animate-pulse">📊</span>
+                                Live Market Data
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* CE Option Data */}
+                                {(liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) && (
+                                    <div className="bg-white p-4 rounded-lg border-2 border-blue-300 shadow-md">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-bold text-blue-700 uppercase">Call Option (CE)</h4>
+                                            <span className="text-xs text-gray-500">{ceSymbolRef.current || 'N/A'}</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs text-gray-600">Live LTP:</span>
+                                                <span className="text-lg font-bold text-blue-600">
+                                                    ₹{liveMarketData.CE.ltp?.toFixed(2) || '0.00'}
+                                                </span>
+                                            </div>
+                                            {liveMarketData.CE.bought_at !== null && (
+                                                <>
+                                                    <div className="flex justify-between items-center border-t pt-2">
+                                                        <span className="text-xs text-gray-600">Bought At:</span>
+                                                        <span className="text-sm font-semibold text-gray-700">
+                                                            ₹{liveMarketData.CE.bought_at?.toFixed(2) || '0.00'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-gray-600">Quantity:</span>
+                                                        <span className="text-sm font-semibold text-gray-700">
+                                                            {liveMarketData.CE.quantity || 0}
+                                                        </span>
+                                                    </div>
+                                                    {liveMarketData.CE.pnl !== null && (
+                                                        <div className={`flex justify-between items-center border-t pt-2 ${
+                                                            liveMarketData.CE.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                                                        }`}>
+                                                            <span className="text-xs font-semibold">Live PNL:</span>
+                                                            <div className="text-right">
+                                                                <div className="text-lg font-bold">
+                                                                    {liveMarketData.CE.pnl >= 0 ? '+' : ''}₹{liveMarketData.CE.pnl?.toFixed(2) || '0.00'}
+                                                                </div>
+                                                                {liveMarketData.CE.pnl_percent !== null && (
+                                                                    <div className="text-xs">
+                                                                        ({liveMarketData.CE.pnl_percent >= 0 ? '+' : ''}{liveMarketData.CE.pnl_percent?.toFixed(2) || '0.00'}%)
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* PE Option Data */}
+                                {(liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined) && (
+                                    <div className="bg-white p-4 rounded-lg border-2 border-red-300 shadow-md">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-bold text-red-700 uppercase">Put Option (PE)</h4>
+                                            <span className="text-xs text-gray-500">{peSymbolRef.current || 'N/A'}</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs text-gray-600">Live LTP:</span>
+                                                <span className="text-lg font-bold text-red-600">
+                                                    ₹{liveMarketData.PE.ltp?.toFixed(2) || '0.00'}
+                                                </span>
+                                            </div>
+                                            {liveMarketData.PE.bought_at !== null && (
+                                                <>
+                                                    <div className="flex justify-between items-center border-t pt-2">
+                                                        <span className="text-xs text-gray-600">Bought At:</span>
+                                                        <span className="text-sm font-semibold text-gray-700">
+                                                            ₹{liveMarketData.PE.bought_at?.toFixed(2) || '0.00'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-gray-600">Quantity:</span>
+                                                        <span className="text-sm font-semibold text-gray-700">
+                                                            {liveMarketData.PE.quantity || 0}
+                                                        </span>
+                                                    </div>
+                                                    {liveMarketData.PE.pnl !== null && (
+                                                        <div className={`flex justify-between items-center border-t pt-2 ${
+                                                            liveMarketData.PE.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                                                        }`}>
+                                                            <span className="text-xs font-semibold">Live PNL:</span>
+                                                            <div className="text-right">
+                                                                <div className="text-lg font-bold">
+                                                                    {liveMarketData.PE.pnl >= 0 ? '+' : ''}₹{liveMarketData.PE.pnl?.toFixed(2) || '0.00'}
+                                                                </div>
+                                                                {liveMarketData.PE.pnl_percent !== null && (
+                                                                    <div className="text-xs">
+                                                                        ({liveMarketData.PE.pnl_percent >= 0 ? '+' : ''}{liveMarketData.PE.pnl_percent?.toFixed(2) || '0.00'}%)
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Left Column - Trade Params */}
                 <div className="space-y-4">
