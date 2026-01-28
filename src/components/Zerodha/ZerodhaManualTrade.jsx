@@ -36,7 +36,7 @@ const ZerodhaManualTrade = () => {
     // WebSocket state
     const [wsStatus, setWsStatus] = useState('disconnected'); // disconnected, connecting, connected, reconnecting
     const [orderResults, setOrderResults] = useState([]); // Track order results
-    
+
     // Keyboard shortcuts state
     const [pressedKeys, setPressedKeys] = useState({
         ctrl: false,
@@ -49,13 +49,24 @@ const ZerodhaManualTrade = () => {
     const pendingOrdersRef = useRef(new Map()); // Track pending orders by account ID
     const handleWebSocketMessageRef = useRef(null); // Ref to always have latest handler
     const handleLiveLTPUpdateRef = useRef(null); // Ref to always have latest LTP handler
-    
+
     // Live market data state
     const [liveMarketData, setLiveMarketData] = useState({
         CE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
         PE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
         _lastUpdate: Date.now() // Force React to detect changes
     });
+
+    // Live index market data state
+    const [liveIndexData, setLiveIndexData] = useState({
+        instrument_name: null,
+        spot_price: null,
+        volume: null,
+        oi: null,
+        change: null,
+        timestamp: null
+    });
+
     const ceSymbolRef = useRef(null);
     const peSymbolRef = useRef(null);
 
@@ -64,14 +75,14 @@ const ZerodhaManualTrade = () => {
         if (process.env.REACT_APP_ZERODHA_MANUAL_WS_URL) {
             return process.env.REACT_APP_ZERODHA_MANUAL_WS_URL;
         }
-        
+
         const baseUrl = process.env.REACT_APP_BASE_URL || 'http://127.0.0.1:8000/';
         // Convert http/https to ws/wss and remove trailing slash
         const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
         const wsHost = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
         return `${wsProtocol}://${wsHost}/ws/manual-zerodha-trade/`;
     };
-    
+
     const WS_URL = getWebSocketUrl();
 
     useEffect(() => {
@@ -99,6 +110,15 @@ const ZerodhaManualTrade = () => {
     const resolveSymbolTimeoutRef = useRef(null);
     // Track last resolved values to prevent duplicate calls
     const lastResolvedRef = useRef({ instrument: '', expiry: '', strike: '', option_type: '' });
+    // Ref to track latest symbolData to avoid stale closures
+    const symbolDataRef = useRef(symbolData);
+    // Flag to track if resolution is in progress
+    const isResolvingRef = useRef(false);
+
+    // Keep symbolDataRef in sync with symbolData
+    useEffect(() => {
+        symbolDataRef.current = symbolData;
+    }, [symbolData]);
 
     // Define subscribeToMarketData first (used by resolveTradingSymbol)
     const subscribeToMarketData = useCallback(async (currentSymbol, instrumentOverride = null, expiryOverride = null, strikeOverride = null) => {
@@ -137,13 +157,17 @@ const ZerodhaManualTrade = () => {
                 ceSymbolRef.current = ceSymbol;
                 peSymbolRef.current = peSymbol;
 
+                // Get instrument name (NIFTY, BANKNIFTY, etc.)
+                const instrumentName = instrument === 'Nifty Bank' ? 'BANKNIFTY' : instrument;
+
                 // Send subscription message
                 const subscribeMessage = {
                     type: 'subscribe_market_data',
                     api_key: account.api_key,
                     access_token: account.zerodha_token,
                     ce_symbol: ceSymbol || null,
-                    pe_symbol: peSymbol || null
+                    pe_symbol: peSymbol || null,
+                    instrument_name: instrumentName
                 };
 
                 wsRef.current.send(JSON.stringify(subscribeMessage));
@@ -155,17 +179,38 @@ const ZerodhaManualTrade = () => {
     }, [accounts, symbolData.instrument, symbolData.expiry, symbolData.strike]);
 
     // Define resolveTradingSymbol before useEffect that uses it
-    const resolveTradingSymbol = useCallback(async () => {
-        // Validate inputs before making API call
-        const instrument = symbolData.instrument;
-        const expiry = symbolData.expiry;
-        const strike = symbolData.strike;
-        const option_type = symbolData.option_type;
-        
+    const resolveTradingSymbol = useCallback(async (instrumentOverride = null, expiryOverride = null, strikeOverride = null, optionTypeOverride = null) => {
+        // Use provided overrides or get latest from ref to avoid stale closures
+        const currentSymbolData = symbolDataRef.current;
+        const instrument = instrumentOverride || currentSymbolData.instrument;
+        const expiry = expiryOverride || currentSymbolData.expiry;
+        const strike = strikeOverride || currentSymbolData.strike;
+        const option_type = optionTypeOverride || currentSymbolData.option_type;
+
         if (!instrument || !expiry || !strike || !option_type) {
             console.warn("⚠️ Cannot resolve symbol: missing required fields", { instrument, expiry, strike, option_type });
+            setResolvedSymbol('');
+            isResolvingRef.current = false;
             return;
         }
+
+        // Check if this exact combination was already resolved
+        const currentKey = `${instrument}-${expiry}-${strike}-${option_type}`;
+        const lastKey = `${lastResolvedRef.current.instrument}-${lastResolvedRef.current.expiry}-${lastResolvedRef.current.strike}-${lastResolvedRef.current.option_type}`;
+
+        if (currentKey === lastKey && lastResolvedRef.current.resolved) {
+            console.log("ℹ️ Symbol already resolved for this combination, skipping API call");
+            // Still update state to ensure UI is in sync
+            if (lastResolvedRef.current.tradingsymbol) {
+                setResolvedSymbol(prev => prev !== lastResolvedRef.current.tradingsymbol ? lastResolvedRef.current.tradingsymbol : prev);
+            }
+            isResolvingRef.current = false;
+            return;
+        }
+
+        // Note: We allow concurrent calls - axios can handle them
+        // The duplicate check above prevents unnecessary calls for the same values
+        isResolvingRef.current = true;
 
         try {
             const payload = {
@@ -180,14 +225,37 @@ const ZerodhaManualTrade = () => {
             console.log("✅ Symbol resolution response:", response.data);
 
             if (response.data && response.data.tradingsymbol) {
-                setResolvedSymbol(response.data.tradingsymbol);
-                
+                const tradingsymbol = response.data.tradingsymbol;
+
+                // Update last resolved values
+                lastResolvedRef.current = {
+                    instrument,
+                    expiry,
+                    strike,
+                    option_type,
+                    resolved: true,
+                    tradingsymbol: tradingsymbol
+                };
+
+                // Force state update - use functional update to ensure it always triggers
+                setResolvedSymbol(prev => {
+                    // Always return new value to force re-render
+                    if (prev !== tradingsymbol) {
+                        console.log("🔄 Updating resolvedSymbol:", prev, "->", tradingsymbol);
+                        return tradingsymbol;
+                    }
+                    // Even if same, return it to ensure state is set
+                    return tradingsymbol;
+                });
+
                 // Subscribe to market data for both CE and PE
-                // Use current symbolData values for subscription
-                subscribeToMarketData(response.data.tradingsymbol, instrument, expiry, strike);
+                // Use current values for subscription
+                subscribeToMarketData(tradingsymbol, instrument, expiry, strike);
             } else {
                 console.warn("⚠️ No tradingsymbol in response:", response.data);
                 setResolvedSymbol('');
+                lastResolvedRef.current.resolved = false;
+                lastResolvedRef.current.tradingsymbol = null;
             }
         } catch (error) {
             console.error("❌ Symbol resolution failed:", error);
@@ -196,60 +264,107 @@ const ZerodhaManualTrade = () => {
                 console.error("Response status:", error.response.status);
             }
             setResolvedSymbol('');
+            lastResolvedRef.current.resolved = false;
+            lastResolvedRef.current.tradingsymbol = null;
+        } finally {
+            isResolvingRef.current = false;
+
+            // After resolution completes, check if there are newer values to resolve
+            // This handles the case where user typed rapidly while resolution was in progress
+            const latestData = symbolDataRef.current;
+            const latestKey = `${latestData.instrument}-${latestData.expiry}-${latestData.strike}-${latestData.option_type}`;
+            const resolvedKey = `${lastResolvedRef.current.instrument}-${lastResolvedRef.current.expiry}-${lastResolvedRef.current.strike}-${lastResolvedRef.current.option_type}`;
+
+            if (latestData.instrument && latestData.expiry && latestData.strike && latestData.option_type &&
+                latestKey !== resolvedKey) {
+                console.log("🔄 New values detected after resolution, scheduling new resolution");
+                // Schedule a new resolution for the latest values
+                setTimeout(() => {
+                    resolveTradingSymbol(
+                        latestData.instrument,
+                        latestData.expiry,
+                        latestData.strike,
+                        latestData.option_type
+                    );
+                }, 50);
+            }
         }
-    }, [symbolData.instrument, symbolData.expiry, symbolData.strike, symbolData.option_type, subscribeToMarketData]);
+    }, [subscribeToMarketData]);
 
     // Auto-resolve symbol when dependent fields change
     useEffect(() => {
+        // Update ref synchronously to ensure we have latest values
+        symbolDataRef.current = symbolData;
+
         // Clear any pending timeout
         if (resolveSymbolTimeoutRef.current) {
             clearTimeout(resolveSymbolTimeoutRef.current);
             resolveSymbolTimeoutRef.current = null;
         }
 
+        // Get latest values from ref (now guaranteed to be current)
+        const currentSymbolData = symbolDataRef.current;
+
         // Check if all required fields are present
-        const hasAllFields = symbolData.instrument && symbolData.expiry && symbolData.strike && symbolData.option_type;
-        
-        // Check if values actually changed
-        const valuesChanged = 
-            lastResolvedRef.current.instrument !== symbolData.instrument ||
-            lastResolvedRef.current.expiry !== symbolData.expiry ||
-            lastResolvedRef.current.strike !== symbolData.strike ||
-            lastResolvedRef.current.option_type !== symbolData.option_type;
-        
-        if (hasAllFields && valuesChanged) {
+        const hasAllFields = currentSymbolData.instrument &&
+            currentSymbolData.expiry &&
+            currentSymbolData.strike &&
+            currentSymbolData.option_type;
+
+        if (hasAllFields) {
             // Debounce the API call to avoid too many requests
-            console.log("🔄 Symbol data changed, scheduling resolution:", symbolData);
-            console.log("📊 Previous values:", lastResolvedRef.current);
-            
+            // Always schedule a call if fields are complete - let resolveTradingSymbol handle duplicate prevention
+            console.log("🔄 Symbol data changed, scheduling resolution:", currentSymbolData);
+
             resolveSymbolTimeoutRef.current = setTimeout(() => {
-                // Double-check values haven't changed during debounce
-                const currentValues = {
-                    instrument: symbolData.instrument,
-                    expiry: symbolData.expiry,
-                    strike: symbolData.strike,
-                    option_type: symbolData.option_type
-                };
-                
-                // Update last resolved values
-                lastResolvedRef.current = { ...currentValues };
-                
-                console.log("📡 Calling resolveTradingSymbol with:", currentValues);
-                resolveTradingSymbol();
-            }, 300); // 300ms debounce
-        } else if (!hasAllFields) {
+                // Get latest values again at execution time to avoid stale closures
+                const latestSymbolData = symbolDataRef.current;
+
+                // Only check if values are still valid - don't compare with currentKey
+                // This ensures we always call when user stops typing, even if values changed during debounce
+                if (latestSymbolData.instrument &&
+                    latestSymbolData.expiry &&
+                    latestSymbolData.strike &&
+                    latestSymbolData.option_type) {
+
+                    console.log("📡 Calling resolveTradingSymbol with latest values:", latestSymbolData);
+                    resolveTradingSymbol(
+                        latestSymbolData.instrument,
+                        latestSymbolData.expiry,
+                        latestSymbolData.strike,
+                        latestSymbolData.option_type
+                    );
+                } else {
+                    console.log("⚠️ Values became invalid during debounce");
+                }
+                // Clear the timeout ref after execution
+                resolveSymbolTimeoutRef.current = null;
+            }, 1000); // 1000ms debounce
+        } else {
             // Reset immediately if fields are incomplete
             console.log("⚠️ Incomplete symbol data, resetting");
-            setResolvedSymbol('');
+            setResolvedSymbol(prev => prev !== '' ? '' : prev); // Force update even if already empty
             setLiveMarketData({
                 CE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
                 PE: { ltp: null, bought_at: null, quantity: 0, pnl: null, pnl_percent: null },
                 _lastUpdate: Date.now()
             });
+            setLiveIndexData({
+                instrument_name: null,
+                spot_price: null,
+                volume: null,
+                oi: null,
+                change: null,
+                timestamp: null
+            });
             // Reset last resolved values
-            lastResolvedRef.current = { instrument: '', expiry: '', strike: '', option_type: '' };
-        } else {
-            console.log("ℹ️ Symbol data unchanged, skipping API call");
+            lastResolvedRef.current = {
+                instrument: '',
+                expiry: '',
+                strike: '',
+                option_type: '',
+                resolved: false
+            };
         }
 
         // Cleanup timeout on unmount or when dependencies change
@@ -284,7 +399,7 @@ const ZerodhaManualTrade = () => {
                 console.log("✅ WebSocket connected");
                 setWsStatus('connected');
                 reconnectAttemptsRef.current = 0;
-                
+
                 // Send ping to keep connection alive
                 const pingInterval = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
@@ -315,14 +430,14 @@ const ZerodhaManualTrade = () => {
             ws.onclose = (event) => {
                 console.warn(`🔌 WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
                 setWsStatus('disconnected');
-                
+
                 // Attempt reconnection if not intentional close
                 if (event.code !== 1000 && reconnectAttemptsRef.current < 5) {
                     reconnectAttemptsRef.current += 1;
                     const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
                     console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/5)`);
                     setWsStatus('reconnecting');
-                    
+
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connectWebSocket();
                     }, delay);
@@ -338,12 +453,12 @@ const ZerodhaManualTrade = () => {
     const handleLiveLTPUpdate = useCallback((data) => {
         console.log("🔄 handleLiveLTPUpdate called with:", data);
         const { option_type, ltp, bought_at, quantity, pnl, pnl_percent } = data;
-        
+
         if (!option_type || (option_type !== 'CE' && option_type !== 'PE')) {
             console.warn("⚠️ Invalid option_type:", option_type);
             return;
         }
-        
+
         // Use functional update to ensure we have the latest state
         setLiveMarketData(prev => {
             // Get current values for the option type being updated
@@ -354,7 +469,7 @@ const ZerodhaManualTrade = () => {
                 pnl: null,
                 pnl_percent: null
             };
-            
+
             // Create updated data - always use new values if provided, otherwise keep current
             const updatedOptionData = {
                 ltp: (ltp !== null && ltp !== undefined) ? Number(ltp) : currentData.ltp,
@@ -363,23 +478,23 @@ const ZerodhaManualTrade = () => {
                 pnl: (pnl !== null && pnl !== undefined) ? Number(pnl) : currentData.pnl,
                 pnl_percent: (pnl_percent !== null && pnl_percent !== undefined) ? Number(pnl_percent) : currentData.pnl_percent
             };
-            
+
             // Always create a completely new state object with a new timestamp
             const newState = {
                 CE: option_type === 'CE' ? updatedOptionData : { ...prev.CE },
                 PE: option_type === 'PE' ? updatedOptionData : { ...prev.PE },
                 _lastUpdate: Date.now() // Always change this to force React re-render
             };
-            
+
             console.log("📊 Updated market data state:", JSON.stringify(newState, null, 2));
             console.log("📊 Previous state was:", JSON.stringify(prev, null, 2));
             console.log("📊 Option type:", option_type, "LTP:", ltp);
             console.log("📊 State changed:", JSON.stringify(newState) !== JSON.stringify(prev));
-            
+
             return newState;
         });
     }, []);
-    
+
     // Update ref whenever handleLiveLTPUpdate changes
     useEffect(() => {
         handleLiveLTPUpdateRef.current = handleLiveLTPUpdate;
@@ -407,8 +522,8 @@ const ZerodhaManualTrade = () => {
                     handleOrderResult(data);
                     // Update bought_at when order is placed successfully
                     if (data.status === 'success' && data.average_price) {
-                        const optionType = data.tradingsymbol?.includes('CE') ? 'CE' : 
-                                         data.tradingsymbol?.includes('PE') ? 'PE' : null;
+                        const optionType = data.tradingsymbol?.includes('CE') ? 'CE' :
+                            data.tradingsymbol?.includes('PE') ? 'PE' : null;
                         if (optionType && data.transaction_type === 'BUY') {
                             setLiveMarketData(prev => ({
                                 ...prev,
@@ -430,6 +545,19 @@ const ZerodhaManualTrade = () => {
                     } else {
                         console.error("⚠️ handleLiveLTPUpdateRef.current is null!");
                     }
+                    break;
+
+                case 'live_index_update':
+                    // Handle live index updates
+                    console.log("📊 Processing live_index_update message:", data);
+                    setLiveIndexData({
+                        instrument_name: data.instrument_name,
+                        spot_price: data.spot_price,
+                        volume: data.volume,
+                        oi: data.oi,
+                        change: data.change,
+                        timestamp: data.timestamp
+                    });
                     break;
 
                 case 'market_data_subscribed':
@@ -705,7 +833,7 @@ const ZerodhaManualTrade = () => {
     useEffect(() => {
         const handleKeyDown = (e) => {
             const isCtrl = e.ctrlKey || e.metaKey; // Support both Ctrl (Windows/Linux) and Cmd (Mac)
-            
+
             // Update pressed keys state
             if (isCtrl) {
                 setPressedKeys(prev => ({ ...prev, ctrl: true }));
@@ -732,7 +860,7 @@ const ZerodhaManualTrade = () => {
 
         const handleKeyUp = (e) => {
             const isCtrl = e.ctrlKey || e.metaKey;
-            
+
             // Update pressed keys state
             if (!isCtrl) {
                 setPressedKeys(prev => ({ ...prev, ctrl: false }));
@@ -783,7 +911,7 @@ const ZerodhaManualTrade = () => {
     return (
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200 w-full max-w-5xl mx-auto mt-6">
             <ToastContainer />
-            
+
             {/* Header with Connection Status */}
             <div className="flex justify-between items-center mb-6 border-b pb-2">
                 <h2 className="text-2xl font-bold text-gray-800">Manual Trade (All Accounts)</h2>
@@ -893,7 +1021,7 @@ const ZerodhaManualTrade = () => {
                                         Ready to trade
                                     </span>
                                 </div>
-                                
+
                                 {/* Quick Action Buttons */}
                                 <div className="flex flex-col gap-3 w-full md:w-auto">
                                     <div className="flex gap-3 w-full md:w-auto">
@@ -901,13 +1029,12 @@ const ZerodhaManualTrade = () => {
                                             type="button"
                                             onClick={handleQuickBuy}
                                             disabled={loading || wsStatus !== 'connected' || !resolvedSymbol}
-                                            className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${
-                                                loading || wsStatus !== 'connected' || !resolvedSymbol
+                                            className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${loading || wsStatus !== 'connected' || !resolvedSymbol
                                                     ? 'bg-gray-400 cursor-not-allowed'
                                                     : pressedKeys.ctrl && pressedKeys.b
                                                         ? 'bg-blue-800 ring-4 ring-blue-300 scale-105'
                                                         : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300 active:scale-95'
-                                            }`}
+                                                }`}
                                         >
                                             {loading ? '⏳' : '🔼'} QUICK BUY
                                             {(pressedKeys.ctrl && pressedKeys.b) && (
@@ -920,13 +1047,12 @@ const ZerodhaManualTrade = () => {
                                             type="button"
                                             onClick={handleQuickSell}
                                             disabled={loading || wsStatus !== 'connected' || !resolvedSymbol}
-                                            className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${
-                                                loading || wsStatus !== 'connected' || !resolvedSymbol
+                                            className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${loading || wsStatus !== 'connected' || !resolvedSymbol
                                                     ? 'bg-gray-400 cursor-not-allowed'
                                                     : pressedKeys.ctrl && pressedKeys.s
                                                         ? 'bg-red-700 ring-4 ring-red-300 scale-105'
                                                         : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300 active:scale-95'
-                                            }`}
+                                                }`}
                                         >
                                             {loading ? '⏳' : '🔽'} QUICK SELL
                                             {(pressedKeys.ctrl && pressedKeys.s) && (
@@ -940,30 +1066,26 @@ const ZerodhaManualTrade = () => {
                                     <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                                         <span className="font-semibold">Shortcuts:</span>
                                         <div className="flex items-center gap-1">
-                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
-                                                pressedKeys.ctrl ? 'bg-yellow-300 ring-2 ring-yellow-400' : ''
-                                            }`}>
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${pressedKeys.ctrl ? 'bg-yellow-300 ring-2 ring-yellow-400' : ''
+                                                }`}>
                                                 {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
                                             </kbd>
                                             <span>+</span>
-                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
-                                                pressedKeys.b ? 'bg-blue-300 ring-2 ring-blue-400' : ''
-                                            }`}>
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${pressedKeys.b ? 'bg-blue-300 ring-2 ring-blue-400' : ''
+                                                }`}>
                                                 B
                                             </kbd>
                                             <span className="text-blue-600 font-semibold">Buy</span>
                                         </div>
                                         <span className="mx-1">|</span>
                                         <div className="flex items-center gap-1">
-                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
-                                                pressedKeys.ctrl ? 'bg-yellow-300 ring-2 ring-yellow-400' : ''
-                                            }`}>
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${pressedKeys.ctrl ? 'bg-yellow-300 ring-2 ring-yellow-400' : ''
+                                                }`}>
                                                 {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}
                                             </kbd>
                                             <span>+</span>
-                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${
-                                                pressedKeys.s ? 'bg-red-300 ring-2 ring-red-400' : ''
-                                            }`}>
+                                            <kbd className={`px-2 py-1 bg-gray-200 rounded text-xs font-mono ${pressedKeys.s ? 'bg-red-300 ring-2 ring-red-400' : ''
+                                                }`}>
                                                 S
                                             </kbd>
                                             <span className="text-red-600 font-semibold">Sell</span>
@@ -979,121 +1101,170 @@ const ZerodhaManualTrade = () => {
                     </div>
                 </div>
 
-                {/* --- Live Market Data Display --- */}
-                {((liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) || 
-                  (liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined)) && (
+                {/* --- Live Index Market Data Display --- */}
+                {liveIndexData.spot_price !== null && liveIndexData.spot_price !== undefined && (
                     <div className="col-span-1 md:col-span-2">
-                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-300 shadow-md">
                             <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                <span className="animate-pulse">📊</span>
-                                Live Market Data
+                                <span className="animate-pulse">📈</span>
+                                Live Index Market Update
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* CE Option Data */}
-                                {(liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) && (
-                                    <div className="bg-white p-4 rounded-lg border-2 border-blue-300 shadow-md">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h4 className="text-sm font-bold text-blue-700 uppercase">Call Option (CE)</h4>
-                                            <span className="text-xs text-gray-500">{ceSymbolRef.current || 'N/A'}</span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-xs text-gray-600">Live LTP:</span>
-                                                <span className="text-lg font-bold text-blue-600">
-                                                    ₹{liveMarketData.CE.ltp?.toFixed(2) || '0.00'}
-                                                </span>
-                                            </div>
-                                            {liveMarketData.CE.bought_at !== null && (
-                                                <>
-                                                    <div className="flex justify-between items-center border-t pt-2">
-                                                        <span className="text-xs text-gray-600">Bought At:</span>
-                                                        <span className="text-sm font-semibold text-gray-700">
-                                                            ₹{liveMarketData.CE.bought_at?.toFixed(2) || '0.00'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-gray-600">Quantity:</span>
-                                                        <span className="text-sm font-semibold text-gray-700">
-                                                            {liveMarketData.CE.quantity || 0}
-                                                        </span>
-                                                    </div>
-                                                    {liveMarketData.CE.pnl !== null && (
-                                                        <div className={`flex justify-between items-center border-t pt-2 ${
-                                                            liveMarketData.CE.pnl >= 0 ? 'text-green-600' : 'text-red-600'
-                                                        }`}>
-                                                            <span className="text-xs font-semibold">Live PNL:</span>
-                                                            <div className="text-right">
-                                                                <div className="text-lg font-bold">
-                                                                    {liveMarketData.CE.pnl >= 0 ? '+' : ''}₹{liveMarketData.CE.pnl?.toFixed(2) || '0.00'}
-                                                                </div>
-                                                                {liveMarketData.CE.pnl_percent !== null && (
-                                                                    <div className="text-xs">
-                                                                        ({liveMarketData.CE.pnl_percent >= 0 ? '+' : ''}{liveMarketData.CE.pnl_percent?.toFixed(2) || '0.00'}%)
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
+                            <div className="bg-white p-4 rounded-lg border-2 border-green-200">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-base font-bold text-green-700 uppercase">
+                                        {liveIndexData.instrument_name || 'NIFTY'}
+                                    </h4>
+                                    {liveIndexData.timestamp && (
+                                        <span className="text-xs text-gray-500">
+                                            {liveIndexData.timestamp}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">Spot Price</div>
+                                        <div className="text-xl font-bold text-green-600">
+                                            {liveIndexData.spot_price?.toFixed(2) || '0.00'}
                                         </div>
                                     </div>
-                                )}
-
-                                {/* PE Option Data */}
-                                {(liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined) && (
-                                    <div className="bg-white p-4 rounded-lg border-2 border-red-300 shadow-md">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h4 className="text-sm font-bold text-red-700 uppercase">Put Option (PE)</h4>
-                                            <span className="text-xs text-gray-500">{peSymbolRef.current || 'N/A'}</span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-xs text-gray-600">Live LTP:</span>
-                                                <span className="text-lg font-bold text-red-600">
-                                                    ₹{liveMarketData.PE.ltp?.toFixed(2) || '0.00'}
-                                                </span>
-                                            </div>
-                                            {liveMarketData.PE.bought_at !== null && (
-                                                <>
-                                                    <div className="flex justify-between items-center border-t pt-2">
-                                                        <span className="text-xs text-gray-600">Bought At:</span>
-                                                        <span className="text-sm font-semibold text-gray-700">
-                                                            ₹{liveMarketData.PE.bought_at?.toFixed(2) || '0.00'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-xs text-gray-600">Quantity:</span>
-                                                        <span className="text-sm font-semibold text-gray-700">
-                                                            {liveMarketData.PE.quantity || 0}
-                                                        </span>
-                                                    </div>
-                                                    {liveMarketData.PE.pnl !== null && (
-                                                        <div className={`flex justify-between items-center border-t pt-2 ${
-                                                            liveMarketData.PE.pnl >= 0 ? 'text-green-600' : 'text-red-600'
-                                                        }`}>
-                                                            <span className="text-xs font-semibold">Live PNL:</span>
-                                                            <div className="text-right">
-                                                                <div className="text-lg font-bold">
-                                                                    {liveMarketData.PE.pnl >= 0 ? '+' : ''}₹{liveMarketData.PE.pnl?.toFixed(2) || '0.00'}
-                                                                </div>
-                                                                {liveMarketData.PE.pnl_percent !== null && (
-                                                                    <div className="text-xs">
-                                                                        ({liveMarketData.PE.pnl_percent >= 0 ? '+' : ''}{liveMarketData.PE.pnl_percent?.toFixed(2) || '0.00'}%)
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">Change</div>
+                                        <div className={`text-lg font-semibold ${liveIndexData.change >= 0 ? 'text-green-600' : 'text-red-600'
+                                            }`}>
+                                            {liveIndexData.change >= 0 ? '+' : ''}{liveIndexData.change?.toFixed(2) || '0.00'}
                                         </div>
                                     </div>
-                                )}
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">Volume</div>
+                                        <div className="text-lg font-semibold text-gray-700">
+                                            {liveIndexData.volume ? liveIndexData.volume.toLocaleString() : '0'}
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">OI</div>
+                                        <div className="text-lg font-semibold text-gray-700">
+                                            {liveIndexData.oi ? liveIndexData.oi.toLocaleString() : '0'}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
+
+                {/* --- Live Market Data Display --- */}
+                {((liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) ||
+                    (liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined)) && (
+                        <div className="col-span-1 md:col-span-2">
+                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                    <span className="animate-pulse">📊</span>
+                                    Live Option LTP Updates
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* CE Option Data */}
+                                    {(liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) && (
+                                        <div className="bg-white p-4 rounded-lg border-2 border-blue-300 shadow-md">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className="text-sm font-bold text-blue-700 uppercase">Call Option (CE)</h4>
+                                                <span className="text-xs text-gray-500">{ceSymbolRef.current || 'N/A'}</span>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs text-gray-600">Live LTP:</span>
+                                                    <span className="text-lg font-bold text-blue-600">
+                                                        ₹{liveMarketData.CE.ltp?.toFixed(2) || '0.00'}
+                                                    </span>
+                                                </div>
+                                                {liveMarketData.CE.bought_at !== null && (
+                                                    <>
+                                                        <div className="flex justify-between items-center border-t pt-2">
+                                                            <span className="text-xs text-gray-600">Bought At:</span>
+                                                            <span className="text-sm font-semibold text-gray-700">
+                                                                ₹{liveMarketData.CE.bought_at?.toFixed(2) || '0.00'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs text-gray-600">Quantity:</span>
+                                                            <span className="text-sm font-semibold text-gray-700">
+                                                                {liveMarketData.CE.quantity || 0}
+                                                            </span>
+                                                        </div>
+                                                        {liveMarketData.CE.pnl !== null && (
+                                                            <div className={`flex justify-between items-center border-t pt-2 ${liveMarketData.CE.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                                                                }`}>
+                                                                <span className="text-xs font-semibold">Live PNL:</span>
+                                                                <div className="text-right">
+                                                                    <div className="text-lg font-bold">
+                                                                        {liveMarketData.CE.pnl >= 0 ? '+' : ''}₹{liveMarketData.CE.pnl?.toFixed(2) || '0.00'}
+                                                                    </div>
+                                                                    {liveMarketData.CE.pnl_percent !== null && (
+                                                                        <div className="text-xs">
+                                                                            ({liveMarketData.CE.pnl_percent >= 0 ? '+' : ''}{liveMarketData.CE.pnl_percent?.toFixed(2) || '0.00'}%)
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* PE Option Data */}
+                                    {(liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined) && (
+                                        <div className="bg-white p-4 rounded-lg border-2 border-red-300 shadow-md">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className="text-sm font-bold text-red-700 uppercase">Put Option (PE)</h4>
+                                                <span className="text-xs text-gray-500">{peSymbolRef.current || 'N/A'}</span>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs text-gray-600">Live LTP:</span>
+                                                    <span className="text-lg font-bold text-red-600">
+                                                        ₹{liveMarketData.PE.ltp?.toFixed(2) || '0.00'}
+                                                    </span>
+                                                </div>
+                                                {liveMarketData.PE.bought_at !== null && (
+                                                    <>
+                                                        <div className="flex justify-between items-center border-t pt-2">
+                                                            <span className="text-xs text-gray-600">Bought At:</span>
+                                                            <span className="text-sm font-semibold text-gray-700">
+                                                                ₹{liveMarketData.PE.bought_at?.toFixed(2) || '0.00'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs text-gray-600">Quantity:</span>
+                                                            <span className="text-sm font-semibold text-gray-700">
+                                                                {liveMarketData.PE.quantity || 0}
+                                                            </span>
+                                                        </div>
+                                                        {liveMarketData.PE.pnl !== null && (
+                                                            <div className={`flex justify-between items-center border-t pt-2 ${liveMarketData.PE.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                                                                }`}>
+                                                                <span className="text-xs font-semibold">Live PNL:</span>
+                                                                <div className="text-right">
+                                                                    <div className="text-lg font-bold">
+                                                                        {liveMarketData.PE.pnl >= 0 ? '+' : ''}₹{liveMarketData.PE.pnl?.toFixed(2) || '0.00'}
+                                                                    </div>
+                                                                    {liveMarketData.PE.pnl_percent !== null && (
+                                                                        <div className="text-xs">
+                                                                            ({liveMarketData.PE.pnl_percent >= 0 ? '+' : ''}{liveMarketData.PE.pnl_percent?.toFixed(2) || '0.00'}%)
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 {/* Left Column - Trade Params */}
                 <div className="space-y-4">
@@ -1225,18 +1396,17 @@ const ZerodhaManualTrade = () => {
                         <button
                             type="submit"
                             disabled={loading || !resolvedSymbol || wsStatus !== 'connected'}
-                            className={`w-full py-3 px-4 rounded-md text-white font-semibold transition-all shadow-md ${
-                                loading || !resolvedSymbol || wsStatus !== 'connected' 
-                                    ? 'bg-gray-400 cursor-not-allowed' 
-                                    : formData.transaction_type === 'BUY' 
-                                        ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300' 
+                            className={`w-full py-3 px-4 rounded-md text-white font-semibold transition-all shadow-md ${loading || !resolvedSymbol || wsStatus !== 'connected'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : formData.transaction_type === 'BUY'
+                                        ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300'
                                         : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300'
-                            }`}
+                                }`}
                         >
                             {loading ? 'Placing Orders...' :
                                 wsStatus !== 'connected' ? 'WebSocket Not Connected' :
-                                !resolvedSymbol ? 'Resolve Symbol First' :
-                                    `${formData.transaction_type} ${resolvedSymbol} (Advanced Form)`}
+                                    !resolvedSymbol ? 'Resolve Symbol First' :
+                                        `${formData.transaction_type} ${resolvedSymbol} (Advanced Form)`}
                         </button>
                         <p className="text-center text-xs text-gray-500 mt-2">
                             * Calculating qty based on Real-Time Price (for Market Orders) or Limit Price.
@@ -1256,20 +1426,18 @@ const ZerodhaManualTrade = () => {
                         {orderResults.slice(-10).reverse().map((result, idx) => (
                             <div
                                 key={idx}
-                                className={`p-3 rounded border ${
-                                    result.status === 'success' ? 'bg-green-50 border-green-200' :
-                                    result.status === 'failed' ? 'bg-red-50 border-red-200' :
-                                    'bg-yellow-50 border-yellow-200'
-                                }`}
+                                className={`p-3 rounded border ${result.status === 'success' ? 'bg-green-50 border-green-200' :
+                                        result.status === 'failed' ? 'bg-red-50 border-red-200' :
+                                            'bg-yellow-50 border-yellow-200'
+                                    }`}
                             >
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <span className="font-semibold">{result.tradingsymbol}</span>
-                                        <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                                            result.status === 'success' ? 'bg-green-200' :
-                                            result.status === 'failed' ? 'bg-red-200' :
-                                            'bg-yellow-200'
-                                        }`}>
+                                        <span className={`ml-2 px-2 py-1 rounded text-xs ${result.status === 'success' ? 'bg-green-200' :
+                                                result.status === 'failed' ? 'bg-red-200' :
+                                                    'bg-yellow-200'
+                                            }`}>
                                             {result.status}
                                         </span>
                                     </div>
