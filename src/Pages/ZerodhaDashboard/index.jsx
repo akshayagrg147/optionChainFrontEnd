@@ -8,6 +8,7 @@ import ZerodhaTradeTable from "../../components/Zerodha/ZerodhaTradeControls";
 import ZerodhaTradeTableSecond from "../../components/Zerodha/ZerodhaTradeControlSecond";
 import ZerodhaMarketTable from "../../components/Zerodha/ZerodhaMarketTable";
 import ZerodhaManualTrade from "../../components/Zerodha/ZerodhaManualTrade";
+import ZerodhaMessageLog from "../../components/Zerodha/ZerodhaMessageLog";
 
 const initialRows = [
     {
@@ -108,6 +109,8 @@ const ZerodhaDashboard = () => {
                                         data={reverseTrade ? reverseData : data}
                                         setData={reverseTrade ? setReverseData : setData}
                                     />
+
+                                    <ZerodhaMessageLog />
                                 </>
                             )}
                         </ZerodhaWebSocketProvider>

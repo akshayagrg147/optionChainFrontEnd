@@ -7,7 +7,12 @@ import { useZerodhaWebSocket } from "../../ZerodhaWebSocketContext";
 import { toast, ToastContainer } from "react-toastify";
 
 
+import { useRef } from "react";
+
 const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setReverseTrade, spreadSize, setSpreadSize, isSimulation, setIsSimulation }) => {
+  const { ceData, peData } = useZerodhaWebSocket();
+
+
 
   useEffect(() => {
     if (data.length === 0) return;
@@ -65,7 +70,6 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
   //     }))
   //   )
   // ]);
-  const { ceData, peData } = useZerodhaWebSocket();
   console.log(ceData, peData, "ceDatapeData");
 
   useEffect(() => {
@@ -262,6 +266,53 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
   return (
     <>
       <ToastContainer />
+      <div className="flex items-center gap-6 bg-white p-4 rounded shadow w-full ml-4 mb-4">
+        <div className="flex items-center gap-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Reverse Trade</label>
+          <div
+            onClick={() => setReverseTrade(!reverseTrade)}
+            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${reverseTrade ? 'bg-green-500' : 'bg-gray-300'}`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${reverseTrade ? 'left-[1.50rem]' : 'left-1'}`}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Simulation</label>
+          <div
+            onClick={() => setIsSimulation(!isSimulation)}
+            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${isSimulation ? 'bg-blue-500' : 'bg-gray-300'}`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${isSimulation ? 'left-[1.50rem]' : 'left-1'}`}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">RTP Value</label>
+          <input
+            type="number"
+            value={rtpValue}
+            onChange={(e) => setRtpValue(e.target.value)}
+            className="px-3 py-1 border rounded-md focus:outline-none focus:ring focus:ring-blue-200 w-64"
+            placeholder="Enter RTP"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">SPREAD Size</label>
+          <input
+            type="text"
+            value={spreadSize}
+            onChange={(e) => setSpreadSize(e.target.value)}
+            className="px-3 py-1 border rounded-md focus:outline-none focus:ring focus:ring-blue-200 w-64"
+            placeholder="Enter RTP"
+          />
+        </div>
+      </div>
+
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
         <div className="overflow-y-auto h-full">
           <table className="min-w-full text-sm text-left">
@@ -530,52 +581,8 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
         </div>
       </div>
 
-      <div className="flex items-center gap-6 bg-white p-4 rounded shadow w-full ml-4 mt-4">
-        <div className="flex items-center gap-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Reverse Trade</label>
-          <div
-            onClick={() => setReverseTrade(!reverseTrade)}
-            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${reverseTrade ? 'bg-green-500' : 'bg-gray-300'}`}
-          >
-            <div
-              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${reverseTrade ? 'left-[1.50rem]' : 'left-1'}`}
-            />
-          </div>
-        </div>
+      {/* WebSocket Message Log */}
 
-        <div className="flex items-center gap-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Simulation</label>
-          <div
-            onClick={() => setIsSimulation(!isSimulation)}
-            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${isSimulation ? 'bg-blue-500' : 'bg-gray-300'}`}
-          >
-            <div
-              className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${isSimulation ? 'left-[1.50rem]' : 'left-1'}`}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">RTP Value</label>
-          <input
-            type="number"
-            value={rtpValue}
-            onChange={(e) => setRtpValue(e.target.value)}
-            className="px-3 py-1 border rounded-md focus:outline-none focus:ring focus:ring-blue-200 w-64"
-            placeholder="Enter RTP"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">SPREAD Size</label>
-          <input
-            type="text"
-            value={spreadSize}
-            onChange={(e) => setSpreadSize(e.target.value)}
-            className="px-3 py-1 border rounded-md focus:outline-none focus:ring focus:ring-blue-200 w-64"
-            placeholder="Enter RTP"
-          />
-        </div>
-      </div>
     </>
   );
 };

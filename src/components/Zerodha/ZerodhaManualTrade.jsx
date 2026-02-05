@@ -70,6 +70,23 @@ const ZerodhaManualTrade = () => {
     const ceSymbolRef = useRef(null);
     const peSymbolRef = useRef(null);
 
+    // Message History State
+    const [messageHistory, setMessageHistory] = useState([]);
+
+    const logMessage = useCallback((direction, data) => {
+        const timestamp = new Date().toLocaleTimeString();
+        setMessageHistory(prev => {
+            const newMsg = {
+                direction, // 'IN' or 'OUT'
+                timestamp,
+                type: data.type || 'unknown',
+                data
+            };
+            // Keep all messages
+            return [newMsg, ...prev];
+        });
+    }, []);
+
     // Construct WebSocket URL from base URL
     const getWebSocketUrl = () => {
         if (process.env.REACT_APP_ZERODHA_MANUAL_WS_URL) {
@@ -84,6 +101,71 @@ const ZerodhaManualTrade = () => {
     };
 
     const WS_URL = getWebSocketUrl();
+
+    // Helper to format logs for text file
+    const formatLogForText = (msg) => {
+        const { timestamp, direction, data } = msg;
+        const dir = direction === 'IN' ? 'RECEIVED' : 'SENT';
+
+        // 1. Order / Sell Confirmation (Block Format)
+        if (data.message && (data.message.includes("Order placed") || data.message.includes("SELL"))) {
+            const isBuy = data.BUY_LTP !== undefined;
+            const isSell = data.SELL_LTP !== undefined;
+            const action = isBuy ? "✅ Buy Order Placed" : isSell ? "✅ SELL Order Placed" : "Order Update";
+
+            return `------------------------------------------------------------
+${timestamp} | INFO | 
+==================== ${data.account_name ? data.account_name.toUpperCase() : 'UNKNOWN'} | ${action} ====================
+Trading_Symbol: ${data.Type === 'CE' || data.Type === 'PE' ? `OPTION_${data.Type}` : 'N/A'}
+Action: ${isBuy ? 'BUY' : 'SELL'}
+${isBuy ? `BUY LTP: ${data.BUY_LTP}` : ''}${isSell ? `SELL LTP: ${data.SELL_LTP}` : ''}
+${data.pnl_percentage ? `P & L percent: ${data.pnl_percentage}` : ''}
+Time: ${timestamp}
+------------------------------------------------------------`;
+        }
+
+        // 2. Ticks / PnL Updates (Single Line)
+        if (data.pnl_update) {
+            return `[${timestamp}] [PnL] Account: ${data.account_name} | LTP: ${data.current_ltp} | Spot: ${data.spot} | PnL: ${data.pnl_percent}% | Locked: ${data.locked_ltp}`;
+        }
+
+        if (data.type === 'BOUGHT_OPTION' || data.type === 'CE' || data.type === 'PE') {
+            return `[${timestamp}] [MARKET] ${data.type} | LTP: ${data.ltp} | Change: ${data.change?.toFixed(2)}`;
+        }
+
+        if (data.type === 'SPOT') {
+            return `[${timestamp}] [SPOT] ${data.index_name} | Price: ${data.spot_price || data.ltp}`;
+        }
+
+        if (data.init_SL) {
+            return `[${timestamp}] [SL] Trailing SL Init | Locked: ${data.locked_LTP} | Step: ${data.step_size}`;
+        }
+
+        // Fallback for generic JSON
+        const content = typeof data === 'string' ? data : JSON.stringify(data);
+        return `[${timestamp}] [${dir}] [${msg.type || 'UNKNOWN'}] ${content}`;
+    };
+
+    // Download logs helper
+    const downloadLogs = useCallback(() => {
+        if (!messageHistory || messageHistory.length === 0) {
+            toast.info("No logs to download");
+            return;
+        }
+
+        const lines = messageHistory.map(formatLogForText);
+
+        const dataStr = lines.join('\n\n');
+        const blob = new Blob([dataStr], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `zerodha_manual_logs_${new Date().toISOString()}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, [messageHistory]);
 
     useEffect(() => {
         // Load accounts from localStorage
@@ -171,6 +253,7 @@ const ZerodhaManualTrade = () => {
                 };
 
                 wsRef.current.send(JSON.stringify(subscribeMessage));
+                logMessage('OUT', subscribeMessage);
                 console.log("📡 Subscribed to market data:", subscribeMessage);
             }
         } catch (error) {
@@ -505,6 +588,9 @@ const ZerodhaManualTrade = () => {
         handleWebSocketMessageRef.current = (data) => {
             console.log("📩 WebSocket message received:", data);
 
+            // Log incoming message
+            logMessage('IN', data);
+
             switch (data.type) {
                 case 'connection':
                     if (data.status === 'connected') {
@@ -785,6 +871,7 @@ const ZerodhaManualTrade = () => {
                 // Send via WebSocket
                 try {
                     wsRef.current.send(JSON.stringify(orderMessage));
+                    logMessage('OUT', orderMessage);
                     console.log(`📤 Order sent for account ${account.id}:`, orderMessage);
                 } catch (err) {
                     console.error(`❌ Failed to send order for account ${account.id}:`, err);
@@ -1030,10 +1117,10 @@ const ZerodhaManualTrade = () => {
                                             onClick={handleQuickBuy}
                                             disabled={loading || wsStatus !== 'connected' || !resolvedSymbol}
                                             className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${loading || wsStatus !== 'connected' || !resolvedSymbol
-                                                    ? 'bg-gray-400 cursor-not-allowed'
-                                                    : pressedKeys.ctrl && pressedKeys.b
-                                                        ? 'bg-blue-800 ring-4 ring-blue-300 scale-105'
-                                                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300 active:scale-95'
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : pressedKeys.ctrl && pressedKeys.b
+                                                    ? 'bg-blue-800 ring-4 ring-blue-300 scale-105'
+                                                    : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300 active:scale-95'
                                                 }`}
                                         >
                                             {loading ? '⏳' : '🔼'} QUICK BUY
@@ -1048,10 +1135,10 @@ const ZerodhaManualTrade = () => {
                                             onClick={handleQuickSell}
                                             disabled={loading || wsStatus !== 'connected' || !resolvedSymbol}
                                             className={`flex-1 md:flex-none px-6 py-3 rounded-lg font-bold text-white transition-all shadow-lg relative ${loading || wsStatus !== 'connected' || !resolvedSymbol
-                                                    ? 'bg-gray-400 cursor-not-allowed'
-                                                    : pressedKeys.ctrl && pressedKeys.s
-                                                        ? 'bg-red-700 ring-4 ring-red-300 scale-105'
-                                                        : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300 active:scale-95'
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : pressedKeys.ctrl && pressedKeys.s
+                                                    ? 'bg-red-700 ring-4 ring-red-300 scale-105'
+                                                    : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300 active:scale-95'
                                                 }`}
                                         >
                                             {loading ? '⏳' : '🔽'} QUICK SELL
@@ -1397,10 +1484,10 @@ const ZerodhaManualTrade = () => {
                             type="submit"
                             disabled={loading || !resolvedSymbol || wsStatus !== 'connected'}
                             className={`w-full py-3 px-4 rounded-md text-white font-semibold transition-all shadow-md ${loading || !resolvedSymbol || wsStatus !== 'connected'
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : formData.transaction_type === 'BUY'
-                                        ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300'
-                                        : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300'
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : formData.transaction_type === 'BUY'
+                                    ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-300'
+                                    : 'bg-red-500 hover:bg-red-600 hover:shadow-red-300'
                                 }`}
                         >
                             {loading ? 'Placing Orders...' :
@@ -1427,16 +1514,16 @@ const ZerodhaManualTrade = () => {
                             <div
                                 key={idx}
                                 className={`p-3 rounded border ${result.status === 'success' ? 'bg-green-50 border-green-200' :
-                                        result.status === 'failed' ? 'bg-red-50 border-red-200' :
-                                            'bg-yellow-50 border-yellow-200'
+                                    result.status === 'failed' ? 'bg-red-50 border-red-200' :
+                                        'bg-yellow-50 border-yellow-200'
                                     }`}
                             >
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <span className="font-semibold">{result.tradingsymbol}</span>
                                         <span className={`ml-2 px-2 py-1 rounded text-xs ${result.status === 'success' ? 'bg-green-200' :
-                                                result.status === 'failed' ? 'bg-red-200' :
-                                                    'bg-yellow-200'
+                                            result.status === 'failed' ? 'bg-red-200' :
+                                                'bg-yellow-200'
                                             }`}>
                                             {result.status}
                                         </span>
@@ -1458,6 +1545,52 @@ const ZerodhaManualTrade = () => {
                     </div>
                 </div>
             )}
+
+            {/* WebSocket Message Logger */}
+            <div className="mt-8 border-t-2 border-gray-200 pt-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <span>📝</span> Live Trade Data
+                    </h3>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={downloadLogs}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                            Download Logs
+                        </button>
+                        <button
+                            onClick={() => setMessageHistory([])}
+                            className="text-xs text-red-600 hover:text-red-800 underline"
+                        >
+                            Clear Log
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-gray-900 text-green-400 font-mono text-xs p-4 rounded-lg shadow-inner h-96 overflow-y-auto">
+                    {messageHistory.length === 0 ? (
+                        <div className="text-gray-500 italic text-center py-10">Waiting for messages...</div>
+                    ) : (
+                        <div className="space-y-1">
+                            {messageHistory.map((msg, idx) => (
+                                <div key={idx} className="border-b border-gray-800 pb-1 mb-1 last:border-0">
+                                    <div className="flex gap-2 mb-1 opacity-75">
+                                        <span className={`font-bold ${msg.direction === 'IN' ? 'text-blue-400' : 'text-yellow-400'}`}>
+                                            [{msg.direction === 'IN' ? 'RECEIVED' : 'SENT'}]
+                                        </span>
+                                        <span className="text-gray-400">{msg.timestamp}</span>
+                                        <span className="text-gray-500">{msg.type}</span>
+                                    </div>
+                                    <pre className="whitespace-pre-wrap break-all text-gray-300 pl-4 border-l-2 border-gray-700">
+                                        {JSON.stringify(msg.data, null, 2)}
+                                    </pre>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

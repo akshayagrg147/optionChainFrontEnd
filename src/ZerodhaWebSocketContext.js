@@ -9,6 +9,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
   const sendTimeout = useRef(null);
   const [ceData, setCeData] = useState(null);
   const [peData, setPeData] = useState(null);
+  const [messageHistory, setMessageHistory] = useState([]); // Store unlimited log history
   const [isSocketReady, setIsSocketReady] = useState(false);
   const lastSentTradesRef = useRef([]); // for checking duplicates
   const sentMessageMapRef = useRef([]); // [{ token, id }]
@@ -25,6 +26,22 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
     tradeDataRef.current = tradeData;
   }, [tradeData]);
   const socketUrl = process.env.REACT_APP_ZERODHA_WEB_SOCKET_URL;
+
+  // Helper to log messages
+  const logMessage = (direction, data) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setMessageHistory((prev) => {
+      const newMsg = {
+        direction, // 'IN' or 'OUT'
+        timestamp,
+        type: data.type || (data.message ? 'info' : 'unknown'),
+        data,
+      };
+      // Keep all messages (unlimited as requested)
+      return [...prev, newMsg];
+    });
+  };
+
   console.log(tradeData, "socketUrl");
   const connectWebSocket = () => {
     if (!socketUrl) {
@@ -150,6 +167,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
       try {
         const data = JSON.parse(event.data);
         console.log("📩 WebSocket Data:", data);
+        logMessage('IN', data); // Log incoming message
 
         // ✅ Check for error from Upstox API
         if (data.error) {
@@ -625,6 +643,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
 
     try {
       socketRef.current.send(JSON.stringify(payloadArray));
+      logMessage('OUT', payloadArray); // Log outgoing message
     } catch (err) {
       console.error("❌ Failed to send bulk WS message:", err);
     }
@@ -746,7 +765,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
   };
 
   return (
-    <WebSocketContext.Provider value={{ ceData, peData }}>
+    <WebSocketContext.Provider value={{ ceData, peData, messageHistory, setMessageHistory }}>
       {children}
     </WebSocketContext.Provider>
   );
