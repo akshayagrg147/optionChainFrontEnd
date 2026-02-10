@@ -274,11 +274,11 @@ const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
               <tr>
                 <th className="px-4 py-2">Type</th>
                 <th className="px-4 py-2">Instrument</th>
-                <th className="px-4 py-2">Strike Price</th>
-                <th className="px-4 py-2">Date Of Contract</th>
+                {/* <th className="px-4 py-2">Strike Price</th> */}
+                {/* <th className="px-4 py-2">Date Of Contract</th> */}
                 <th className="px-4 py-2">Current Market</th>
-                <th className="px-4 py-2">Target Market</th>
-                <th className="px-4 py-2">Lot Size</th>
+                {/* <th className="px-4 py-2">Target Market</th> */}
+                {/* <th className="px-4 py-2">Lot Size</th> */}
                 {/* <th className="px-4 py-2">LTP Locked</th> */}
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">P/L %</th>
@@ -311,7 +311,7 @@ const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
                       row.instrument
                     )}
                   </td>
-                  <td className="px-4 py-2">
+                  {/* <td className="px-4 py-2">
                     {row.editMode ? (
                       <input
                         type="number"
@@ -326,8 +326,8 @@ const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
                     ) : (
                       row.strikePrice
                     )}
-                  </td>
-                  <td className="px-4 py-2">
+                  </td> */}
+                  {/* <td className="px-4 py-2">
                     {row.editMode ? (
                       <input
                         type="date"
@@ -342,9 +342,9 @@ const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
                     ) : (
                       row.dateOfContract
                     )}
-                  </td>
+                  </td> */}
                   <td className="px-4 py-2">{row.currentMarket}</td>
-                  <td className="px-4 py-2">
+                  {/* <td className="px-4 py-2">
                     {row.editMode ? (
                       <input
                         type="number"
@@ -363,8 +363,8 @@ const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
                     ) : (
                       row.type === "CALL" ? row.targetMarketCE : row.targetMarketPE
                     )}
-                  </td>
-                  <td className="px-4 py-2">
+                  </td> */}
+                  {/* <td className="px-4 py-2">
                     {row.editMode ? (
                       <input
                         type="number"
@@ -379,7 +379,7 @@ const ZerodhaTradeTableSecond = ({ data, setData, setRtpValue }) => {
                     ) : (
                       row.lotSize
                     )}
-                  </td>
+                  </td> */}
                   {/* <td className="px-4 py-2">{row.ltpLocked}</td> */}
                   <td className="px-4 py-2">
                     {row.editMode ? (

@@ -102,7 +102,7 @@ const ZerodhaDashboard = () => {
                                         setIsSimulation={setIsSimulation}
                                     />
                                     {reverseTrade &&
-                                        <ZerodhaTradeTableSecond data={reverseData} setData={setReverseData} />}
+                                        <ZerodhaTradeTableSecond data={reverseData} setData={setReverseData}  />}
 
 
                                     <ZerodhaMarketTable

@@ -207,7 +207,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
                 ? {
                   ...item,
                   status: "Waiting for Square-Off",
-                  buyInLTP: data?.BUY_LTP,
+                  buyInLTP: data?.normal_trade_buyLtp,
                   pl: 0 // Initial PnL is 0
                 }
                 : item
@@ -230,7 +230,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           setTradeData((prev) =>
             prev.map((item) => ({
               ...item,
-              pl: data?.pnl_percent,
+              pl: data?.normal_pnl_percentage,
               ltpLocked: data?.locked_ltp ?? data?.locked_LTP ?? item.ltpLocked,
               // Optionally update current LTP if you track it in tradeData
             }))
@@ -255,8 +255,8 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           // setRtpValue(data?.market_value) // Backend does not send market_value here
           setReverseData(prev =>
             prev.map(item => ({
-              ...item,
-              status: "Waiting for Square-Off",
+                  ...item,
+                  status: "Waiting for Square-Off",
               buyInLTP: data?.BUY_LTP,
               // Backend doesn't send locked_LTP or pl here initially
               ltpLocked: 0,
@@ -281,9 +281,9 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
             setReverseData((prev) => {
               console.log("📝 Updating Reverse Data with:", data.pnl_percentage);
               return prev.map((item) => ({
-                ...item,
-                status: "Orders Selled",
-                buyInLTP: data?.SELL_LTP,
+                    ...item,
+                    status: "Orders Selled",
+                    buyInLTP: data?.SELL_LTP,
                 pl: data?.pnl_percentage,
               }));
             });
