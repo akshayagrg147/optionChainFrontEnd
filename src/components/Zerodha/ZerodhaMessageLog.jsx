@@ -12,50 +12,70 @@ const ZerodhaMessageLog = () => {
             logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
         }
     }, [messageHistory]);
+    const getAccountFundsFromStorage = (accountName) => {
+        try {
+            const stored = localStorage.getItem("zerodha-funds");
+            if (!stored) return null;
+
+            const accounts = JSON.parse(stored);
+
+            return accounts.find(
+                acc => acc.name?.toLowerCase() === accountName?.toLowerCase()
+            );
+        } catch (err) {
+            console.error("Error reading zerodhaAccounts:", err);
+            return null;
+        }
+    };
 
     // Helper to format logs for text file
     const formatLogForText = (msg) => {
-        const { timestamp, direction, data } = msg;
-        const dir = direction === 'IN' ? 'RECEIVED' : 'SENT';
+        const { timestamp, data } = msg;
 
-        // 1. Order / Sell Confirmation (Block Format)
-        if (data.message && (data.message.includes("Order placed") || data.message.includes("SELL"))) {
-            const isBuy = data.BUY_LTP !== undefined;
-            const isSell = data.SELL_LTP !== undefined;
-            const action = isBuy ? "✅ Buy Order Placed" : isSell ? "✅ SELL Order Placed" : "Order Update";
+        if (!data || !data.message) return null;
 
-            return `------------------------------------------------------------
-${timestamp} | INFO | 
-==================== ${data.account_name ? data.account_name.toUpperCase() : 'UNKNOWN'} | ${action} ====================
-Trading_Symbol: ${data.Type === 'CE' || data.Type === 'PE' ? `OPTION_${data.Type}` : 'N/A'}
-Action: ${isBuy ? 'BUY' : 'SELL'}
-${isBuy ? `BUY LTP: ${data.BUY_LTP}` : ''}${isSell ? `SELL LTP: ${data.SELL_LTP}` : ''}
-${data.pnl_percentage ? `P & L percent: ${data.pnl_percentage}` : ''}
+        const isSell = data.message.includes("SELL");
+        const isBuy = data.message.includes("Buy") || data.message.includes("BUY") || data.message.includes('Order placed successfully...Waiting for square off');
+        const isReverse = data.message.includes("Reverse");
+
+        if (!isSell && !isBuy && !isReverse) return null;
+
+        const actionText = isSell
+            ? "✅ SELL Order Placed"
+            : isReverse
+                ? "✅ Reverse Buy Order Placed"
+                : "✅ Buy Order Placed";
+
+        // ✅ Fetch account fallback data
+        const accountData = getAccountFundsFromStorage(data.account_name);
+        console.log(accountData, "accountData");
+
+        const totalAmount =
+            data.total_amount && data.total_amount !== "N/A"
+                ? data.total_amount
+                : accountData?.funds || "N/A";
+
+        const investableAmount =
+            data.investable_amount && data.investable_amount !== "N/A"
+                ? data.investable_amount
+                : accountData?.investable_amount || "N/A";
+
+        return `${timestamp},867 | INFO | 
+==================== ${data.account_name?.toUpperCase() || "UNKNOWN"} | ${actionText} ====================
+Token_Purchase: ${data.token_purchase || data.Token_Purchase || "N/A"}
+Trading_Symbol: ${data.trading_symbol || data.Trading_Symbol || "N/A"}
+Market Value: ${data.market_value || data.marketValue || "N/A"}
+${isSell ? `SELL LTP: ${data.SELL_LTP}` : ""}
+${isBuy || isReverse ? `BUY LTP: ${data.BUY_LTP}` : ""}
+Quantity: ${data.quantity || data.qty || "N/A"}
+Total Amount: ${totalAmount}
+Investable Amount: ${investableAmount}
+${data.pnl_percentage !== undefined ? `P & L percent: ${data.pnl_percentage}` : ""}
 Time: ${timestamp}
 ------------------------------------------------------------`;
-        }
-
-        // 2. Ticks / PnL Updates (Single Line)
-        if (data.pnl_update) {
-            return `[${timestamp}] [PnL] Account: ${data.account_name} | LTP: ${data.current_ltp} | Spot: ${data.spot} | PnL: ${data.pnl_percent}% | Locked: ${data.locked_ltp}`;
-        }
-
-        if (data.type === 'BOUGHT_OPTION' || data.type === 'CE' || data.type === 'PE') {
-            return `[${timestamp}] [MARKET] ${data.type} | LTP: ${data.ltp} | Change: ${data.change?.toFixed(2)}`;
-        }
-
-        if (data.type === 'SPOT') {
-            return `[${timestamp}] [SPOT] ${data.index_name} | Price: ${data.spot_price || data.ltp}`;
-        }
-
-        if (data.init_SL) {
-            return `[${timestamp}] [SL] Trailing SL Init | Locked: ${data.locked_LTP} | Step: ${data.step_size}`;
-        }
-
-        // Fallback for generic JSON
-        const content = typeof data === 'string' ? data : JSON.stringify(data);
-        return `[${timestamp}] [${dir}] [${msg.type || 'UNKNOWN'}] ${content}`;
     };
+
+
 
     // Download logs helper
     const downloadLogs = () => {
@@ -64,19 +84,27 @@ Time: ${timestamp}
             return;
         }
 
-        const lines = messageHistory.map(formatLogForText);
+        const lines = messageHistory
+            .map(formatLogForText)
+            .filter(line => line !== null);   // ✅ Only valid order logs
 
-        const dataStr = lines.join('\n\n');
+        if (lines.length === 0) {
+            toast.info("No Order logs available");
+            return;
+        }
+
+        const dataStr = lines.join('\n');
         const blob = new Blob([dataStr], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `zerodha_automated_logs_${new Date().toISOString()}.txt`;
+        link.download = `zerodha_order_logs_${new Date().toISOString()}.txt`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     };
+
 
     return (
         <div className="mt-6 ml-4 bg-white rounded-lg shadow border border-gray-200 p-4">

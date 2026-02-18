@@ -68,15 +68,21 @@ const TradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade, setRev
   useEffect(() => {
     if (!ceData && !peData) return;
 
-    setData((prevData) =>
+   setData((prevData) =>
       prevData.map((item) => {
         if (item.editMode) return item;
 
         if (ceData && item.type === "CALL") {
-          return { ...item, liveInLTP: ceData.ltp, strikePrice: ceData.strike, currentMarket: ceData.spot_price };
+          return { ...item, liveInLTP: ceData.ltp, currentMarket: ceData.spot_price };
         }
         if (peData && item.type === "PUT") {
-          return { ...item, liveInLTP: peData.ltp, strikePrice: peData.strike, currentMarket: peData.spot_price };
+          return { ...item, liveInLTP: peData.ltp, currentMarket: peData.spot_price };
+        }
+        if (item.type == "BOUGHT_OPTION") {
+          return { ...item, liveInLTP: item?.current_ltp, currentMarket: item?.spot_price };
+        }
+        if (!item.type) {
+          return { ...item, liveInLTP: item?.current_ltp, currentMarket: item?.spot };
         }
         return item;
       })

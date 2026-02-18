@@ -1187,60 +1187,7 @@ Time: ${timestamp}
                         )}
                     </div>
                 </div>
-
-                {/* --- Live Index Market Data Display --- */}
-                {liveIndexData.spot_price !== null && liveIndexData.spot_price !== undefined && (
-                    <div className="col-span-1 md:col-span-2">
-                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-300 shadow-md">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                <span className="animate-pulse">📈</span>
-                                Live Index Market Update
-                            </h3>
-                            <div className="bg-white p-4 rounded-lg border-2 border-green-200">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-base font-bold text-green-700 uppercase">
-                                        {liveIndexData.instrument_name || 'NIFTY'}
-                                    </h4>
-                                    {liveIndexData.timestamp && (
-                                        <span className="text-xs text-gray-500">
-                                            {liveIndexData.timestamp}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="text-center">
-                                        <div className="text-xs text-gray-600 mb-1">Spot Price</div>
-                                        <div className="text-xl font-bold text-green-600">
-                                            {liveIndexData.spot_price?.toFixed(2) || '0.00'}
-                                        </div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-xs text-gray-600 mb-1">Change</div>
-                                        <div className={`text-lg font-semibold ${liveIndexData.change >= 0 ? 'text-green-600' : 'text-red-600'
-                                            }`}>
-                                            {liveIndexData.change >= 0 ? '+' : ''}{liveIndexData.change?.toFixed(2) || '0.00'}
-                                        </div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-xs text-gray-600 mb-1">Volume</div>
-                                        <div className="text-lg font-semibold text-gray-700">
-                                            {liveIndexData.volume ? liveIndexData.volume.toLocaleString() : '0'}
-                                        </div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-xs text-gray-600 mb-1">OI</div>
-                                        <div className="text-lg font-semibold text-gray-700">
-                                            {liveIndexData.oi ? liveIndexData.oi.toLocaleString() : '0'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- Live Market Data Display --- */}
-                {((liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) ||
+   {((liveMarketData.CE.ltp !== null && liveMarketData.CE.ltp !== undefined) ||
                     (liveMarketData.PE.ltp !== null && liveMarketData.PE.ltp !== undefined)) && (
                         <div className="col-span-1 md:col-span-2">
                             <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
@@ -1352,6 +1299,59 @@ Time: ${timestamp}
                             </div>
                         </div>
                     )}
+                {/* --- Live Index Market Data Display --- */}
+                {liveIndexData.spot_price !== null && liveIndexData.spot_price !== undefined && (
+                    <div className="col-span-1 md:col-span-2">
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-300 shadow-md">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <span className="animate-pulse">📈</span>
+                                Live Index Market Update
+                            </h3>
+                            <div className="bg-white p-4 rounded-lg border-2 border-green-200">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-base font-bold text-green-700 uppercase">
+                                        {liveIndexData.instrument_name || 'NIFTY'}
+                                    </h4>
+                                    {liveIndexData.timestamp && (
+                                        <span className="text-xs text-gray-500">
+                                            {liveIndexData.timestamp}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">Spot Price</div>
+                                        <div className="text-xl font-bold text-green-600">
+                                            {liveIndexData.spot_price?.toFixed(2) || '0.00'}
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">Change</div>
+                                        <div className={`text-lg font-semibold ${liveIndexData.change >= 0 ? 'text-green-600' : 'text-red-600'
+                                            }`}>
+                                            {liveIndexData.change >= 0 ? '+' : ''}{liveIndexData.change?.toFixed(2) || '0.00'}
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">Volume</div>
+                                        <div className="text-lg font-semibold text-gray-700">
+                                            {liveIndexData.volume ? liveIndexData.volume.toLocaleString() : '0'}
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-xs text-gray-600 mb-1">OI</div>
+                                        <div className="text-lg font-semibold text-gray-700">
+                                            {liveIndexData.oi ? liveIndexData.oi.toLocaleString() : '0'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- Live Market Data Display --- */}
+             
 
                 {/* Left Column - Trade Params */}
                 <div className="space-y-4">

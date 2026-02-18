@@ -226,7 +226,7 @@
 //         </div>
 //       </div>
 
-     
+
 //     </>
 //   );
 // };
@@ -239,7 +239,7 @@ import { useWebSocket } from "../../WebSocketContext";
 import axios from "axios";
 
 
-const TradeTableSecond = ({ data, setData,setRtpValue }) => {
+const TradeTableSecond = ({ data, setData, setRtpValue }) => {
 
 
 
@@ -253,17 +253,23 @@ const TradeTableSecond = ({ data, setData,setRtpValue }) => {
         if (item.editMode) return item;
 
         if (ceData && item.type === "CALL") {
-          return { ...item, liveInLTP: ceData.ltp, strikePrice: ceData.strike, currentMarket: ceData.spot_price };
+          return { ...item, liveInLTP: ceData.ltp, currentMarket: ceData.spot_price };
         }
         if (peData && item.type === "PUT") {
-          return { ...item, liveInLTP: peData.ltp, strikePrice: peData.strike, currentMarket: peData.spot_price };
+          return { ...item, liveInLTP: peData.ltp, currentMarket: peData.spot_price };
+        }
+        if (item.type == "BOUGHT_OPTION") {
+          return { ...item, liveInLTP: item?.current_ltp, currentMarket: item?.spot_price };
+        }
+        if (!item.type) {
+          return { ...item, liveInLTP: item?.current_ltp, currentMarket: item?.spot };
         }
         return item;
       })
     );
   }, [ceData, peData]);
 
- 
+
   return (
     <>
       <div className="p-4 bg-white rounded-lg shadow border border-gray-200 overflow-x-auto ml-4 h-auto">
@@ -442,7 +448,7 @@ const TradeTableSecond = ({ data, setData,setRtpValue }) => {
         </div>
       </div>
 
-      
+
     </>
   );
 };

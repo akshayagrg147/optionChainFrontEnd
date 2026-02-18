@@ -246,66 +246,67 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
             }))
           );
         }
+        if (data.message === "SELL Order placed successfully") {
+          // Use Ref to get current value inside closure
+          console.log("✅ Routing to Main Data");
+          // Main Trade SELL -> Update Main Table ONLY
+          // ⚡ USE EXPLICIT MAIN SETTER if available, else fall back to current tradeData setter
+          const updateMain = setMainData || setTradeData;
 
+          setTradeData((prev) =>
+            prev.map((item) =>
+              item.status === "Waiting for Square-Off" 
+                ? {
+                  ...item,
+                  status: "Orders Selled",
+                  buyInLTP: data?.SELL_LTP,
+                  pl: data?.pnl_percentage,
+                }
+                : item
+            )
+          );
+        }
         // Removed "Token sell" block as it's not sent by backend
 
         if (data.message === "Reverse Order placed successfully...Waiting for square off") {
-          console.log("Reverse trade started");
-          setReverseTradeDataTransfer(true)
-          // setRtpValue(data?.market_value) // Backend does not send market_value here
-          setReverseData(prev =>
-            prev.map(item => ({
+          console.log("🔁 Reverse trade started");
+
+          setReverseTradeDataTransfer(true);
+          reverseTradeDataTransferRef.current = true; // ⚡ Important
+
+          setReverseData((prev) =>
+            prev.map((item) =>
+              data.Type === (item.type === "CALL" ? "CE" : "PE")
+                ? {
                   ...item,
                   status: "Waiting for Square-Off",
-              buyInLTP: data?.BUY_LTP,
-              // Backend doesn't send locked_LTP or pl here initially
-              ltpLocked: 0,
-              pl: 0
-            }))
+                  buyInLTP: data?.BUY_LTP,
+                  ltpLocked: 0,
+                  pl: 0,
+                }
+                : item   // ✅ MUST RETURN item
+            )
           );
         }
+
         console.log(reverseTrade, "reverseTrade");
 
-        if (data.message === "SELL Order placed successfully") {
+
+
+        if (data.message === "Reverse Trade SELL Order placed successfully") {
           // Use Ref to get current value inside closure
-          const isReverseMode = reverseTradeDataTransferRef.current;
-          console.log("🔍 SELL Message Received. isReverseMode (Ref):", isReverseMode);
-          console.log("🔍 Payload:", data);
-
-          if (isReverseMode) {
-            console.log("✅ Routing to Reverse Data");
-            // Reverse Trade SELL -> Update Reverse Table ONLY
-            setReverseTradeDataTransfer(false); // Turn off reverse mode
-            reverseTradeDataTransferRef.current = false; // ⚡ UPDATE REF IMMEDIATELY TO PREVENT RACE CONDITION
-
-            setReverseData((prev) => {
-              console.log("📝 Updating Reverse Data with:", data.pnl_percentage);
-              return prev.map((item) => ({
-                    ...item,
-                    status: "Orders Selled",
-                    buyInLTP: data?.SELL_LTP,
+          setReverseData((prev) =>
+            prev.map((item) => (
+              item.status === "Waiting for Square-Off" ?
+              {
+                ...item,
+                status: "Orders Selled",
+                sellLTP: data?.SELL_LTP,   // ✅ Correct field
                 pl: data?.pnl_percentage,
-              }));
-            });
-          } else {
-            console.log("✅ Routing to Main Data");
-            // Main Trade SELL -> Update Main Table ONLY
-            // ⚡ USE EXPLICIT MAIN SETTER if available, else fall back to current tradeData setter
-            const updateMain = setMainData || setTradeData;
+              }:item
+            ))
+          );
 
-            updateMain((prev) =>
-              prev.map((item) =>
-                item.status === "Waiting for Square-Off"
-                  ? {
-                    ...item,
-                    status: "Orders Selled",
-                    buyInLTP: data?.SELL_LTP,
-                    pl: data?.pnl_percentage,
-                  }
-                  : item
-              )
-            );
-          }
           // ✅ Close socket & stop reconnect
           // if (socketRef.current) {
           //   socketRef.current.close();
@@ -321,7 +322,7 @@ export const ZerodhaWebSocketProvider = ({ children, tradeData, setTradeData, se
           // Optional: Update status to 'Completed' or similar if needed
           setTradeData((prev) =>
             prev.map((item) =>
-              item.status === "Waiting for Square-Off"
+              item.status === "Orders Selled"
                 ? {
                   ...item,
                   status: "Completed",

@@ -79,12 +79,14 @@ const ZerodhaTradeTable = ({ data, setData, rtpValue, setRtpValue, reverseTrade,
       prevData.map((item) => {
         if (item.editMode) return item;
 
-        if (ceData && item.type === "CALL") {
+        if (ceData && item.type === "CE") {
           return { ...item, liveInLTP: ceData.ltp, currentMarket: ceData.spot_price };
         }
-        if (peData && item.type === "PUT") {
+        if (peData && item.type === "PE") {
           return { ...item, liveInLTP: peData.ltp, currentMarket: peData.spot_price };
         }
+        
+       
         return item;
       })
     );
